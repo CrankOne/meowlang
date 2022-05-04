@@ -1,12 +1,21 @@
-#include "NA64DPDetectorIDSelect.h"
-
 #include <stdint.h>
 #include <limits.h>
 #include <string.h>
 #include <stdlib.h>
 #include <assert.h>
 
+#include "meowlang.tab.h"
 
+int
+main(int argc, char * argv[]) {
+    mwl_mk_ast( argv[1]
+              , NULL  /* definitions */
+              , stdout  /* debug stream */
+              );
+    return 0;
+}
+
+#if 0
 struct ExternDict {
     int foo, bar;
 };
@@ -113,4 +122,4 @@ main(int argc, char * argv[]) {
 
     return EXIT_SUCCESS;
 }
-
+#endif

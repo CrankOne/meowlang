@@ -7,14 +7,14 @@ LEX=flex
 
 grammar: meowlang.tab.c lex.yy.c
 
-a.out: meowlang.tab.c lex.yy.c main.c
+a.out: meowlang.tab.c lex.yy.c meow_ast.c main.c 
 	gcc -g -ggdb -Wall -I../../include $^
 
 lex.yy.c: meowlang.l meowlang.tab.h
 	$(LEX) --header-file=lex.yy.h $<
 
 meowlang.tab.h meowlang.tab.c: meowlang.y
-	$(YACC) -d -p meowlang_ $<
+	$(YACC) --report=all --report-file=report.txt -d -p meowlang_ $<
 
 clean:
 	rm -fv meowlang.tab.h y.tab.h \

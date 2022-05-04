@@ -1,8 +1,10 @@
-# meowlang
+meowlang
+========
 
 Embedded math expression language.
 
-## Specification
+Specification
+-------------
 
 Just-in-time compiled language will significantly enhance readability and
 flexibility of the whole thing.
@@ -15,7 +17,9 @@ Yet, at these places a generic solution can be applied, in the manner similar
 to DSuL, but with grammar extended and performance leveraged by JIT
 compilation.
 
-C+ API usage (pilot namespace is `emdsl` -- for "event math DSL":
+C+ API usage (pilot namespace is ``emdsl`` -- for "event math DSL":
+
+.. code-block:: cpp
 
     // Create expressions
     emdsl::Expression expr1("SADCHit.eDep + 100");
@@ -31,6 +35,8 @@ C+ API usage (pilot namespace is `emdsl` -- for "event math DSL":
 
 That in principle would simplify handlers and enhance their performance. For
 instance, consider a cut relying on calibration data like:
+
+.. code-block:: yaml
 
     - _type: Discriminate
       expr: "sadcHits[ECAL1:1-2--] > 1.5 MeV"
@@ -48,28 +54,34 @@ Variants:
     - third party solution (?)
 
 
-## Language features
+Language features
+-----------------
 
- - Simple logic expression with literals and variable definitions
+- Simple logic expression with literals and variable definitions
+
+ .. code-block:: cpp
 
     1 > 2
     kin == HCAL
     kin == MM && number == 3
 
  - "nearly equal" expression for floating point numbers comparison
-    
+
+ .. code-block:: cpp
     2.34 == (2.33 +/- .01)
 
  - Math operations
 
+ .. code-block:: cpp
     2 + 3
     3/12
     1e-6^^2.34 / 174.
 
- - Functions: pow(), sin(), log(), etc.
+ - Functions: ``pow()``, ``sin()``, ``log()``, etc.
 
  - Subset lookup and operations
 
+ .. code-block:: cpp
     a = {1: 23, 2: 34, 3: 45}                       => defines a map
     sadcHits[kin == HCAL && number != 4]            => results a map of SADCHit objects
     caloHits[kin == ECAL].eDep                      => result a map of float values indexed by DetID
@@ -77,33 +89,38 @@ Variants:
 
  - Vectorized arithmetics
    A certain arithmetics can be applied to the subsets of data to yield
-   vectorised result: +, -, /, *, ^ -- in case of `a <op> b`, an operation
+   vectorised result: ``+, -, /, *, ^`` -- in case of ``a <op> b``, an operation
    expects the full match. For instance, consider vector sum
 
+ .. code-block:: cpp
     a = {'x': 1, 'y': 2, 'z': 3}
     b = {'x': 3, 'y': 2, 'z': 1}
     a + b
 
    Vectorised operations by default are done with intersection
 
+ .. code-block:: cpp
     a = {'x': 1, 'y': 2, 'u': 4}
     b = {'x': 3, 'y': 2, 'v': 0}
     a + b       => {'x': 4, 'y': 4}
 
    To perform arithmetic operation on the intersection:
 
+ .. code-block:: cpp
     a + b
 
    To perform arithmetic operation on the left/right/both elements preserved:
 
-    a .+ b      => {'x': 4, 'y': 4, 'u': 4}
-    a +. b      => {'x': 4, 'y': 4, 'v': 0}
-    a .+. b     => {'x': 4, 'y': 4, 'u': 4, 'v': 0}
+ .. code-block:: cpp
+    a \+ b      => {'x': 4, 'y': 4, 'u': 4}
+    a +\ b      => {'x': 4, 'y': 4, 'v': 0}
+    a \+\ b     => {'x': 4, 'y': 4, 'u': 4, 'v': 0}
 
    To force matching
 
-   a !+ b       => error: `a' is not fully covered by `b'
-   a +! b       => error: `b' is not fully covered by `a'
-   a !+! b      => 
+ .. code-block:: cpp
+   a .+ b       => error: `a' is not fully covered by `b'
+   a +. b       => error: `b' is not fully covered by `a'
+   a .+. b      => 
 
 

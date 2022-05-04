@@ -1,2 +1,7 @@
 *.swp
 *.swo
+report.txt
+lex.yy.c
+lex.yy.h
+meowlang.tab.h
+meowlang.tab.c
