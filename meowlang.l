@@ -3,9 +3,9 @@
 %option noinput nounput
 
 D           [0-9]
-L           [a-zA-Z_\\]
+L           [a-zA-Z_]
 UL          [A-Z_]
-LOG_CMP     [><]=?
+M           [.!]
 
 %{
 #include <stdio.h>
@@ -28,32 +28,37 @@ LOG_CMP     [><]=?
 %%
 
 [ \t\n]         ; // ignore all whitespaces
-"**"            {return T_ASTERISK2;}
-"&&"            {return T_AMP2;}
-"||"            {return T_PIPE2;}
-"+"             {return T_PLUS;}
-"-"             {return T_MINUS;}
-"*"             {return T_ASTERISK;}
-"/"             {return T_SLASH;}
-"\\"            { return T_REV_SLASH;}
-">"             {return T_GT;}
-">="            {return T_GTE;}
-"<="            {return T_LTE;}
-"=="            {return T_EQ;}
-"!="            {return T_NE;}
-"<"             {return T_LT;}
 "("             { return T_LBC;}
 ")"             { return T_RBC;}
 "["             { return T_LSQBC;}
 "]"             { return T_RSQBC;}
-"{"             { return T_LCRLBC;}
-"}"             { return T_RCRLBC;}
 "~"             { return T_TILDE;}
-"&"             {return T_AMP;}
-"|"             {return T_PIPE;}
-"^"             {return T_CIRCUMFLEX;}
-"!"             {return T_EXCLMM;}
+"!"             { return T_EXCLMM;}
 "."             { return T_DOT;}
+
+{M}?\*\*{M}?        {if(!!(yylval->opCode = mwl_to_opcode(yytext, ws))) return T_EXP_BINOP;
+                        return T_INVALID_OPERATOR;}
+{M}?[*/%]{M}?       {if(!!(yylval->opCode = mwl_to_opcode(yytext, ws))) return T_MULTIPLIC_BINOP;
+                        return T_INVALID_OPERATOR;}
+{M}?[+-]{M}?        {if(!!(yylval->opCode = mwl_to_opcode(yytext, ws))) return T_ADDITIVE_BINOP;
+                        return T_INVALID_OPERATOR;}
+{M}?(<<)|(>>){M}?   {if(!!(yylval->opCode = mwl_to_opcode(yytext, ws))) return T_BTWS_SHIFT;
+                        return T_INVALID_OPERATOR;}
+{M}?[><]=?{M}?      {if(!!(yylval->opCode = mwl_to_opcode(yytext, ws))) return T_LG_COMPARISON;
+                        return T_INVALID_OPERATOR;}
+{M}?!?={M}?         {if(!!(yylval->opCode = mwl_to_opcode(yytext, ws))) return T_NEQ_COMPARISON;
+                        return T_INVALID_OPERATOR;}
+{M}?&{M}?           {if(!!(yylval->opCode = mwl_to_opcode(yytext, ws))) return T_BTWS_BINOP_AND;
+                        return T_INVALID_OPERATOR;}
+{M}?^{M}?           {if(!!(yylval->opCode = mwl_to_opcode(yytext, ws))) return T_BTWS_BINOP_XOR;
+                        return T_INVALID_OPERATOR;}
+{M}?\|{M}?          {if(!!(yylval->opCode = mwl_to_opcode(yytext, ws))) return T_BTWS_BINOP_OR;
+                        return T_INVALID_OPERATOR;}
+{M}?&&{M}?          {if(!!(yylval->opCode = mwl_to_opcode(yytext, ws))) return T_LOG_BINOP_AND;
+                        return T_INVALID_OPERATOR;}
+{M}?\|\|{M}?        {if(!!(yylval->opCode = mwl_to_opcode(yytext, ws))) return T_LOG_BINOP_OR;
+                        return T_INVALID_OPERATOR;}
+
 \"(\\.|[^"\\])*\"  {return T_STRING_LITERAL; /*TODO: copy*/ }
 -?[0-9]+        {   long val = strtol( yytext, NULL, 0 );
                     if( val > MWL_INTEGER_MAX || val < MWL_INTEGER_MIN ) {
@@ -62,7 +67,7 @@ LOG_CMP     [><]=?
                         return T_INVALID_VALUE;
                     }
                     yylval->constval.pl.asInteger = (mwl_Integer_t) val;
-                    yylval->constval.valueType = mwl_kInteger;
+                    yylval->constval.dataType = mwl_kInteger;
                     return T_CONSTVAL_TOKEN;
                 }
 {L}({L}|{D})*   {   /* Lookup for name in symbols table:

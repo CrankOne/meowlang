@@ -8,7 +8,7 @@
 
 int
 main(int argc, char * argv[]) {
-    mwl_mk_ast( argv[1]
+    mwl_mk_AST( argv[1]
               , NULL  /* definitions */
               , stdout  /* debug stream */
               );

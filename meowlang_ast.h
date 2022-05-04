@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#define MWL_ERROR_INCOMPAT_TYPE     -100   /* incompatible types */
+
 /** Integer type used to identify operations */
 typedef uint32_t mwl_OpCode_t;
 /** Integer type used to identify node types */
@@ -16,18 +18,35 @@ typedef int32_t mwl_Integer_t;
 /** C-type of "float" */
 typedef float mwl_Float_t;
 
+/** Temporary workspace structure
+ *
+ * This structure contains the entire parsing and lexical analysis context of
+ * the expression.
+ * */
+typedef struct mwl_Workspace {
+    /** Error message buffer */
+    char * errMsg;
+    unsigned int errMsgSize;
+    /** Problematic fragment: first line, column, last line, column */
+    uint32_t errPos[2][2];
+    /* Expression root node's */
+    struct mwl_ASTNode * root;
+    /* Parser debug messages stream (may be nullptr) */
+    FILE * dbgStream;
+} mwl_Workspace_t;
+
 
 #define M_for_all_opcodes(m, ...) \
     /* Features flags */ \
-    m( FUnary,       (16 << 0x1), __VA_ARGS__ ) \
-    m( FArithmetic,  (16 << 0x2), __VA_ARGS__ ) \
-    m( FBitwise,     (16 << 0x4), __VA_ARGS__ ) \
-    m( FComparison,  (16 << 0x8), __VA_ARGS__ ) \
+    m( FUnary,       ( 0x1 <<  8), __VA_ARGS__ ) \
+    m( FArithmetic,  ( 0x2 <<  8), __VA_ARGS__ ) \
+    m( FBitwise,     ( 0x4 <<  8), __VA_ARGS__ ) \
+    m( FComparison,  ( 0x8 <<  8), __VA_ARGS__ ) \
     /* Options controlling complement consideration */      \
-    m( FS_NoLCompl,  0x10, __VA_ARGS__ ) /* require left complement */   \
-    m( FS_LvLCompl,  0x20, __VA_ARGS__ ) /* leave left complement */     \
-    m( FS_NoRCompl,  0x40, __VA_ARGS__ ) /* require right complement */  \
-    m( FS_LvRCompl,  0x80, __VA_ARGS__ ) /* leave right complement */    \
+    m( FS_NoLCompl,  ( 0x3 << 16), __VA_ARGS__ ) /* require left complement */   \
+    m( FS_LvLCompl,  ( 0x5 << 16), __VA_ARGS__ ) /* leave left complement */     \
+    m( FS_NoRCompl,  ( 0x9 << 16), __VA_ARGS__ ) /* require right complement */  \
+    m( FS_LvRCompl,  (0x11 << 16), __VA_ARGS__ ) /* leave right complement */    \
     /* Logic operator codes */ \
     m( LogicNegate, 1 | kOp_FUnary, __VA_ARGS__ ) \
     m( LogicAnd,    1, __VA_ARGS__ ) \
@@ -52,12 +71,16 @@ typedef float mwl_Float_t;
     m( BtwsAnd,     1 | kOp_FBitwise, __VA_ARGS__ ) \
     m( BtwsOr,      2 | kOp_FBitwise, __VA_ARGS__ ) \
     m( BtwsXor,     3 | kOp_FBitwise, __VA_ARGS__ ) \
+    m( BtwsLShift,  5 | kOp_FBitwise, __VA_ARGS__ ) \
+    m( BtwsRShift,  6 | kOp_FBitwise, __VA_ARGS__ ) \
     /* ... */
 
 #define M_DECLARE_OP_CODE( name, code, ... ) \
     extern const mwl_OpCode_t kOp_ ## name;
 M_for_all_opcodes(M_DECLARE_OP_CODE)
 #undef M_DECLARE_OP_CODE
+
+mwl_OpCode_t mwl_to_opcode( const char * expr, mwl_Workspace_t * ws );
 
 enum mwl_NodeType {
     mwl_kConstValue,    /* Constant, literal or any other immediately evaluated */
@@ -89,7 +112,7 @@ struct mwl_FuncDef {
 };
 
 struct mwl_ConstVal {
-    mwl_TypeCode_t valueType;
+    mwl_TypeCode_t dataType;
     union {
         mwl_Integer_t asInteger;
         mwl_Float_t asFloat;
@@ -132,6 +155,13 @@ struct mwl_ASTNode {
     } pl;
 };
 
+/** Places copies of the nodes, infers type, etc */
+int mwl_init_op_node( struct mwl_ASTNode * dest
+                    , struct mwl_ASTNode * left
+                    , mwl_OpCode_t
+                    , struct mwl_ASTNode * right
+                    , mwl_Workspace_t *
+                    );
 /** Makes shallow copy of the given AST node */
 struct mwl_ASTNode * mwl_shallow_copy_node(struct mwl_ASTNode *);
 /** For given types and operation types, infers result data type */
@@ -143,10 +173,10 @@ mwl_TypeCode_t mwl_infer_type( mwl_TypeCode_t
                              );
 
 /** Dumps AST tree in console */
-void mwl_dump_tree( FILE * stream
-                  , const struct mwl_ASTNode * node
-                  , int indent
-                  );
+void mwl_dump_AST( FILE * stream
+                 , const struct mwl_ASTNode * node
+                 , int indent
+                 );
 
 
 /*                                                               ______________
