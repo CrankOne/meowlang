@@ -1,34 +1,16 @@
-#include "meowlang_ast.h"
+#include "mwl-ops.h"
+#include "mwl-ws.h"
 
-#include <string.h>
-#include <stdlib.h>
 #include <assert.h>
-
-const mwl_TypeCode_t mwl_kFIsNumeric= 0x1;
-const mwl_TypeCode_t mwl_kLogic     = (1 << 1);
-const mwl_TypeCode_t mwl_kInteger   = (2 << 1) | mwl_kFIsNumeric;
-const mwl_TypeCode_t mwl_kFloat     = (3 << 1) | mwl_kFIsNumeric;
-const mwl_TypeCode_t mwl_kString    = 0x10 | 0x1;
-/* ... other types */
 
 #define M_DEFINE_OP_CODE( name, code, ... ) \
     const mwl_OpCode_t kOp_ ## name = code;
 M_for_all_opcodes(M_DEFINE_OP_CODE)
 #undef M_DEFINE_OP_CODE
 
-const char * mwl_to_str_type( mwl_TypeCode_t code ) {
-    if( mwl_kLogic == code )    return "logic";
-    if( mwl_kInteger == code )  return "integer";
-    if( mwl_kFloat == code )    return "float";
-    if( mwl_kString == code )   return "string";
-    static char bf[32];
-    snprintf(bf, sizeof(bf), "?%#x?", code);
-    return bf;
-}
-
 mwl_OpCode_t
 mwl_to_opcode( const char * expr
-             , mwl_Workspace_t * ws
+             , struct mwl_Workspace * ws
              ) {  // TODO: check this
     assert(expr);
     size_t n = 0;
@@ -105,25 +87,16 @@ mwl_to_opcode( const char * expr
     if(      '.' == expr[n] ) { opCode |= kOp_FS_LvRCompl; ++n; }
     else if( '!' == expr[n] ) { opCode |= kOp_FS_NoRCompl; ++n; }
     /* We must be done now */
-    printf("xxx \"%s\", %#x\n", expr, opCode);  // XXX
     assert('\0' == expr[n]);
     assert(opCode);
     return opCode;
 }
 
-const char * mwl_to_str_op( mwl_OpCode_t opCode ) {
+const char *
+mwl_to_str_op( mwl_OpCode_t opCode ) {
     static char buf[32];
     snprintf(buf, sizeof(buf), "%#x", opCode);
     return buf;
-}
-
-/*                          * * *   * * *   * * *                           */
-
-struct mwl_ASTNode *
-mwl_shallow_copy_node(struct mwl_ASTNode * node) {
-    struct mwl_ASTNode * result = malloc(sizeof(struct mwl_ASTNode));
-    memcpy(result, node, sizeof(struct mwl_ASTNode));
-    return result;
 }
 
 mwl_TypeCode_t
@@ -148,13 +121,13 @@ mwl_infer_type( mwl_TypeCode_t tcA
                 // one have to assure that we deal with numeric data types
                 // on both of the sides
                 if( (mwl_kFIsNumeric & tcA) && (mwl_kFIsNumeric & tcB) )
-                    return mwl_kLogic;
+                    return mwl_kTpLogic;
                 // For strings only "equals to" and "does not equal to" are
                 // defined
-                if( (mwl_kString == tcA)
-                 && (mwl_kString & tcB)
+                if( (mwl_kTpString == tcA)
+                 && (mwl_kTpString & tcB)
                  && (opCode == kOp_CmpEq || opCode == kOp_CmpNE) )
-                    return mwl_kLogic;
+                    return mwl_kTpLogic;
                 // error of comparsion types
                 snprintf( errBuf, errBufSize
                         , "can not compare %s with %s by operator `%s'"
@@ -168,8 +141,8 @@ mwl_infer_type( mwl_TypeCode_t tcA
                 // for binary bitwise operations (AND, OR, XOR) the result is
                 // always an integer; we have to just check that both operands
                 // are of integer type
-                if( tcA == mwl_kInteger && tcB == mwl_kInteger )
-                    return mwl_kInteger;
+                if( tcA == mwl_kTpInteger && tcB == mwl_kTpInteger )
+                    return mwl_kTpInteger;
                 snprintf( errBuf, errBufSize
                         , "can not apply `%s' bitwise operation on %s and %s"
                         , mwl_to_str_op(opCode)
@@ -198,90 +171,12 @@ mwl_infer_type( mwl_TypeCode_t tcA
                             );
                     return 0x0;
                 }
-                if( tcA == mwl_kFloat ) return mwl_kFloat;
-                if( tcB == mwl_kFloat ) return mwl_kFloat;
-                return mwl_kInteger;
+                if( tcA == mwl_kTpFloat ) return mwl_kTpFloat;
+                if( tcB == mwl_kTpFloat ) return mwl_kTpFloat;
+                return mwl_kTpInteger;
             }  // arithmetic operation
         }  // binary operation
     }  // scalar data type
     return 0x0;
-}
-
-int
-mwl_init_op_node( struct mwl_ASTNode * dest
-                , struct mwl_ASTNode * left
-                , mwl_OpCode_t opCode
-                , struct mwl_ASTNode * right
-                , mwl_Workspace_t * ws
-                ) {
-    mwl_OpCode_t tp = mwl_infer_type( left->dataType, opCode, right->dataType
-                                    , ws->errMsg, ws->errMsgSize );
-    if(!tp) {
-        printf("xyx\n");  // XXX
-        if('\0' == ws->errMsg[0]) {
-            snprintf( ws->errMsg, ws->errMsgSize
-                    , "failed to infer resulting type of the operation" );
-        }
-        return MWL_ERROR_INCOMPAT_TYPE;
-    }
-    dest->nodeType = mwl_kOperation;
-    dest->dataType = tp;
-    dest->pl.asOp.code = opCode;
-    dest->pl.asOp.a = mwl_shallow_copy_node(left);
-    if(right)
-        dest->pl.asOp.b = mwl_shallow_copy_node(right);
-    return 0;
-}
-
-/*                                                        _____________________
- * _____________________________________________________/ Printing functions */
-
-size_t
-mwl_to_str_constval( char * buf
-                   , size_t n
-                   , const struct mwl_ConstVal * obj
-                   ) {
-    if( obj->dataType == mwl_kLogic )
-        return snprintf(buf, n, "%s", obj->pl.asInteger ? "true" : "false");
-    if( obj->dataType == mwl_kInteger )
-        return snprintf(buf, n, "%ld", (long int) obj->pl.asInteger );
-    if( obj->dataType == mwl_kFloat )
-        return snprintf(buf, n, "%f", (double) obj->pl.asFloat );
-    if( obj->dataType == mwl_kString )
-        return snprintf(buf, n, "\"%s\"", obj->pl.asString );
-    return snprintf(buf, n, "???" );  // TODO: hex dump of data
-}
-
-void
-mwl_dump_AST( FILE * stream
-            , const struct mwl_ASTNode * node
-            , int indent
-            ) {
-    fprintf(stream, "%*c", indent, ' ');
-    if(!node) {
-        fprintf(stream, "(null node)\n");
-        return;
-    }
-    char nodeDumpBuf[128];
-    switch( node->nodeType ) {
-        case mwl_kConstValue: {
-            mwl_to_str_constval(nodeDumpBuf, sizeof(nodeDumpBuf), &(node->pl.asConstVal));
-            fprintf(stream, "constval:%s", nodeDumpBuf);
-        break; };
-        case mwl_kOperation: {
-            fprintf( stream, "op:`%s' <%s>\n"
-                   , mwl_to_str_op(node->pl.asOp.code)
-                   , mwl_to_str_type(node->dataType)
-                   );
-            mwl_dump_AST(stream, node->pl.asOp.a, indent + 2);
-            if(node->pl.asOp.b)
-                mwl_dump_AST(stream, node->pl.asOp.b, indent + 2);
-            return;  // goto end?
-        break; };
-        default:
-            fprintf(stream, "%p\n", node);
-        // ...
-    };
-    fprintf(stream, " <%s>\n", mwl_to_str_type(node->dataType));
 }
 

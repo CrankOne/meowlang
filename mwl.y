@@ -1,65 +1,67 @@
 %code requires {
 
-#include "meowlang_ast.h"
-#include <stdio.h>
+#include "mwl-ast.h"
+#include "mwl-ws.h"
+#include "mwl-ops.h"
+#include <assert.h>
 
 /* Compile function error codes */
-#define MEOW_STREXPR_BAD         -1  /* bad argument expression NULL or not a string */
-#define MEOW_BUFFER_EXHAUSTED    -2  /* bad or insufficient buffer */
-#define MEOW_MEMORY_ERROR        -3  /* heap allocation failure */
-#define MEOW_TRANSLATION_ERROR   -4  /* syntax/parser/lexer error */
-#define MEOW_BAD_GETTERS_TABLE   -5  /* bad getter table entry */
+#define MWL_UNRESOLVED_IDENTIFIER_ERROR     -1  /* failed to resolve identifier */
+#define MWL_TRANSLATION_ERROR               -2  /* syntax/parser/lexer error */
+#define MWL_RESULT_TYPE_ERROR               -3  /* failed to infer return type */
 
 typedef void *yyscan_t;  /* circumvent circular dep: YACC/BISON does not know this type */
+
 }
 
 %define api.pure full
 %define parse.error verbose
 %locations
 
-%lex-param {mwl_Workspace_t * ws}
+%lex-param {struct mwl_Workspace * ws}
 %lex-param {yyscan_t yyscanner}
 
-%parse-param {mwl_Workspace_t * ws}
+%parse-param {struct mwl_Workspace * ws}
 %parse-param {yyscan_t yyscanner}
 
 %code provides {
 
-#include "meowlang_ast.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <assert.h>
-
 #define YY_DECL                             \
-    int meowlang_lex( YYSTYPE* yylval_param \
-                    , YYLTYPE* yylloc_param \
-                    , mwl_Workspace_t * ws \
-                    , yyscan_t yyscanner )
+    int mwl_lex( YYSTYPE* yylval_param      \
+               , YYLTYPE* yylloc_param      \
+               , struct mwl_Workspace * ws       \
+               , yyscan_t yyscanner )
 YY_DECL;
 
-void meowlang_error( struct YYLTYPE *
-                   , mwl_Workspace_t *
-                   , yyscan_t yyscanner
-                   , const char* );
+void mwl_error( struct YYLTYPE *
+              , struct mwl_Workspace *
+              , yyscan_t yyscanner
+              , const char* );
 
-int mwl_mk_AST( char * strexpr
-              , const struct mwl_Definitions * definitions
-              , FILE * dbgStream );
+#ifdef __cplusplus
+extern "C"
+#endif
+struct mwl_ASTNode *
+mwl_mk_AST( char * strexpr
+          , const struct mwl_Definitions * definitions
+          , FILE * dbgStream );
 
 }
 
 %union {
-    const char * strID;
+    char * strID;
     mwl_OpCode_t opCode;
-    struct mwl_ConstVal constval;
-    struct mwl_ASTNode astNode;
+    struct mwl_ConstVal      constval;
+    struct mwl_ASTNode       astNode;
+    struct mwl_ArgsList      argsList;
     /* ... */
 }
 
+%destructor { free($$); } <strID>
+
 %token<strID> L_STR
 %token T_LBC T_RBC T_LSQBC T_RSQBC T_LCRLBC T_RCRLBC
-%token T_DOT T_REV_SLASH T_TILDE T_EXCLMM
+%token T_DOT T_COMMA T_REV_SLASH T_TILDE T_EXCLMM
 
 %token<opCode> T_EXP_BINOP T_MULTIPLIC_BINOP T_ADDITIVE_BINOP T_BTWS_SHIFT
 %token<opCode> T_LG_COMPARISON T_NEQ_COMPARISON
@@ -68,9 +70,13 @@ int mwl_mk_AST( char * strexpr
 
 %type<astNode> expr logicOr logicAnd bitwiseOr bitwiseXor bitwiseAnd logicNeq
 %type<astNode> gtCmp btwsShift addBinop multBinop expBinop value
+%type<astNode> foreignVal
 
-%token T_UNKNOWN_IDENTIFIER T_INVALID_VALUE T_INVALID_OPERATOR T_FOREIGN_VALUE T_FOREIGN_CALL
+%type<argsList> arguments
+
+%token T_INVALID_VALUE T_INVALID_OPERATOR T_FOREIGN_VALUE T_FOREIGN_CALL
 %token<constval> T_CONSTVAL_TOKEN T_STRING_LITERAL
+%token<strID> T_UNKNOWN_IDENTIFIER
 
 //%left T_GT T_GTE T_LT T_LTE T_EQ T_NE
 //%left T_LBC T_RBC
@@ -80,7 +86,7 @@ int mwl_mk_AST( char * strexpr
 %%
 
      toplev : error
-            { ws->root = NULL; return MEOW_TRANSLATION_ERROR; }
+            { ws->root = NULL; return MWL_TRANSLATION_ERROR; }
             | expr { ws->root = mwl_shallow_copy_node(&($1)); }
             ;
 
@@ -149,8 +155,68 @@ int mwl_mk_AST( char * strexpr
                 $$.nodeType = mwl_kConstValue;
             }
             //| foreignCall T_LBC expr T_RBC
-            //| foreignValue
+            | foreignVal
             ;
+
+ foreignVal : T_UNKNOWN_IDENTIFIER {
+                if( mwl_resolve_identifier_to_ast(&($$), ws->defs, $1) ) {
+                    char errbf[128];
+                    snprintf( errbf, sizeof(errbf)
+                            , "failed to resolve plain identifier \"%s\""
+                            , $1);
+                    yyerror( &yylloc, ws, NULL, errbf );
+                    free($1);
+                    return MWL_UNRESOLVED_IDENTIFIER_ERROR;
+                }
+                free($1);
+            }
+            | foreignVal T_DOT T_UNKNOWN_IDENTIFIER {
+                if( $1.nodeType != mwl_kNamespace ) {
+                    char errbf[128];
+                    snprintf( errbf, sizeof(errbf)
+                            , "can not resolve \"%s\" (not within a namespace)"
+                            , $3);
+                    yyerror( &yylloc, ws, NULL, errbf );
+                    free($3);
+                    return MWL_UNRESOLVED_IDENTIFIER_ERROR;
+                }
+                if( mwl_resolve_identifier_to_ast(&($$), $1.pl.asNamespace, $3) ) {
+                    char errbf[128];
+                    snprintf( errbf, sizeof(errbf)
+                            , "failed to resolve scoped identifier \"%s\""
+                            , $3);
+                    yyerror( &yylloc, ws, NULL, errbf );
+                    free($3);
+                    return MWL_UNRESOLVED_IDENTIFIER_ERROR;
+                }
+                free($3);
+            }
+            | foreignVal T_LBC arguments T_RBC {
+                assert($1.nodeType == mwl_kFunction);
+                $$ = $1;
+                $$.dataType = mwl_resolve_func_return_type(
+                        $1.pl.asFunction.funcdef, &($3) );
+                if( ! $$.dataType ) {
+                    yyerror(&yylloc, ws, NULL, "Failed to resolve function"
+                        " result type.");
+                    return MWL_RESULT_TYPE_ERROR;
+                }
+                $$.pl.asFunction.argsList = $3;
+            }
+            //| foreignVal T_LSQBC expr T_RSQBC  // selector
+            ;
+
+  arguments : expr {
+                $$.self = mwl_shallow_copy_node(&($1));
+                $$.next = NULL;
+            }
+            | arguments T_COMMA expr {
+                $$.self = mwl_shallow_copy_node(&($3));
+                $$.next = mwl_shallow_copy_args(&($1));
+            }
+            ;
+
+// XXX
 
 //    princOp : cmpOp             { $$ = $1; }
 //            | T_PLUS            { $$ = kOp_ArithAdd; }
@@ -210,7 +276,7 @@ int mwl_mk_AST( char * strexpr
 
 void
 yyerror( YYLTYPE * yylloc
-       , mwl_Workspace_t * ws
+       , struct mwl_Workspace * ws
        , yyscan_t yyscanner
        , const char* s
        ) {
@@ -234,22 +300,21 @@ yyerror( YYLTYPE * yylloc
 }
 
 /* Main expression translate and "bake" function */
-int
+struct mwl_ASTNode *
 mwl_mk_AST( char * strexpr
           , const struct mwl_Definitions * definitions
           , FILE * dbgStream ) {
-    mwl_Workspace_t ws;
+    struct mwl_Workspace ws;
     ws.dbgStream = dbgStream;
+    ws.defs = definitions;
 
-    char errMsgBuf[512];
+    char errMsgBuf[512] = "";
     ws.errMsg = errMsgBuf;
     ws.errMsgSize = sizeof(errMsgBuf);
     ws.root = NULL;
     memset(ws.errPos, 0, sizeof(ws.errPos));
 
-    /*
-     * Parse expression
-     */
+    /* Parse expression */
     void * scannerPtr;
     yylex_init(&scannerPtr);
     struct yy_buffer_state * buffer = yy_scan_string(strexpr, scannerPtr);
@@ -265,13 +330,10 @@ mwl_mk_AST( char * strexpr
                , "Parser failure: %s\n"
                , ws.errMsg );
     }
+
     yy_delete_buffer(buffer, scannerPtr);
     yylex_destroy(scannerPtr);
 
-    mwl_dump_AST(dbgStream, ws.root, 2);
-
-    //if( rc ) return rc;
-    //*rootPtr = ws.root;
-    return rc;
+    return ws.root;
 }
 

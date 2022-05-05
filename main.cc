@@ -1,17 +1,23 @@
-#include <stdint.h>
-#include <limits.h>
-#include <string.h>
-#include <stdlib.h>
-#include <assert.h>
+#include <cmath>
 
-#include "meowlang.tab.h"
+#include "mwl.tab.h"
+#include "mwl-ast-print.h"
 
 int
 main(int argc, char * argv[]) {
-    mwl_mk_AST( argv[1]
-              , NULL  /* definitions */
-              , stdout  /* debug stream */
-              );
+    mwl_Definitions defs;
+    defs.define_int_constval( "foo", 42 );
+
+    mwl_Definitions & mathDefs = *defs.define_namespace("m")->second.pl.asNamespacePtr;
+    mathDefs.define_float_constval("pi", M_PI);
+
+    mwl_ASTNode * ast = mwl_mk_AST( argv[1]
+                                  , &defs  /* definitions */
+                                  , stdout  /* debug stream */
+                                  );
+    if( ast ) {
+        mwl_dump_AST(stdout, ast, 2);
+    }
     return 0;
 }
 

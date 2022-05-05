@@ -9,7 +9,7 @@ M           [.!]
 
 %{
 #include <stdio.h>
-#include "meowlang.tab.h"
+#include "mwl.tab.h"
 
 #define YY_USER_ACTION                              \
     yylloc->first_line = yylloc->last_line;         \
@@ -35,6 +35,7 @@ M           [.!]
 "~"             { return T_TILDE;}
 "!"             { return T_EXCLMM;}
 "."             { return T_DOT;}
+","             { return T_COMMA;}
 
 {M}?\*\*{M}?        {if(!!(yylval->opCode = mwl_to_opcode(yytext, ws))) return T_EXP_BINOP;
                         return T_INVALID_OPERATOR;}
@@ -62,20 +63,15 @@ M           [.!]
 \"(\\.|[^"\\])*\"  {return T_STRING_LITERAL; /*TODO: copy*/ }
 -?[0-9]+        {   long val = strtol( yytext, NULL, 0 );
                     if( val > MWL_INTEGER_MAX || val < MWL_INTEGER_MIN ) {
-                        meowlang_error( yylloc, ws, yyscanner
-                                      , "integer value is out of permitted range" );
+                        mwl_error( yylloc, ws, yyscanner
+                                 , "integer value is out of permitted range" );
                         return T_INVALID_VALUE;
                     }
                     yylval->constval.pl.asInteger = (mwl_Integer_t) val;
-                    yylval->constval.dataType = mwl_kInteger;
+                    yylval->constval.dataType = mwl_kTpInteger;
                     return T_CONSTVAL_TOKEN;
                 }
-{L}({L}|{D})*   {   /* Lookup for name in symbols table:
-                     * - return "T_CONSTVAL_TOKEN" for constants
-                     * - return "T_FOREIGN_VALUE" for external parameters
-                     * - return "T_FOREIGN_CALL" for functions
-                     */
-                    return T_UNKNOWN_IDENTIFIER;
-                }
+{L}({L}|{D})*       { yylval->strID = strdup( yytext );
+                      return T_UNKNOWN_IDENTIFIER; }
 
 %%
