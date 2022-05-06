@@ -8,12 +8,16 @@ extern "C" {
 #endif
 
 struct mwl_ASTNode;
+struct mwl_ConstVal;
+
+size_t mwl_to_str_constval( char * buf
+                          , size_t n
+                          , const struct mwl_ConstVal * obj );
 
 /** Dumps AST tree in console */
 void mwl_dump_AST( FILE * stream
                  , const struct mwl_ASTNode * node
-                 , int indent
-                 );
+                 , int depth );
 
 #ifdef __cplusplus
 }  // extern "C"

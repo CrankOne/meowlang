@@ -17,7 +17,7 @@ mwl_to_opcode( const char * expr
     mwl_OpCode_t opCode = 0x0;
     /* Check left complement */
     if(      '.' == expr[0] ) { opCode |= kOp_FS_LvLCompl; ++n; }
-    else if( '!' == expr[0] ) { opCode |= kOp_FS_NoLCompl; ++n; }
+    else if( '!' == expr[0] && expr[1] != '=' ) { opCode |= kOp_FS_NoLCompl; ++n; }
     /* Check the core symbol */
     switch( expr[n] ) {
         /* additive arithmetic */
@@ -45,14 +45,14 @@ mwl_to_opcode( const char * expr
             opCode |= kOp_CmpGT;
             break;
         /* eq/ne comparison */
-        case '=':
-            assert('=' == expr[n+1]);
-            opCode |= kOp_CmpEq;
-            ++n;
-            break;
         case '!':
             assert('=' == expr[n+1]);
             opCode |= kOp_CmpNE;
+            ++n;
+            break;
+        case '=':
+            assert('=' == expr[n+1]);
+            opCode |= kOp_CmpEq;
             ++n;
             break;
         /* AND/OR/XOR -- bitwise and logic */
@@ -92,10 +92,59 @@ mwl_to_opcode( const char * expr
     return opCode;
 }
 
+static int
+mwl_to_str_op_princ(char * dst, mwl_OpCode_t c) {
+    c &= ~(kOp_FS_NoLCompl | kOp_FS_LvLCompl | kOp_FS_NoRCompl | kOp_FS_LvRCompl);
+
+    if(c == kOp_LogicNegate)    {dst[0] = '!'; return 1;}
+    if(c == kOp_BtwsNegate)     {dst[0] = '~'; return 1;}
+    if(c == kOp_ArithNegate)    {dst[0] = '-'; return 1;}
+    if(c == (kOp_ArithAdd | kOp_FUnary)) {dst[0] = '+'; return 1;}
+
+    if(c == kOp_ArithAdd)       {dst[0] = '+'; return 1;}
+    if(c == kOp_ArithSub)       {dst[0] = '-'; return 1;}
+    if(c == kOp_ArithMult)      {dst[0] = '*'; return 1;}
+    if(c == kOp_ArithDiv)       {dst[0] = '/'; return 1;}
+    if(c == kOp_ArithModul)     {dst[0] = '%'; return 1;}
+    if(c == kOp_CmpLT)          {dst[0] = '<'; return 1;}
+    if(c == kOp_CmpGT)          {dst[0] = '>'; return 1;}
+
+    if(c == kOp_BtwsAnd)        {dst[0] = '&'; return 1;}
+    if(c == kOp_BtwsOr)         {dst[0] = '|'; return 1;}
+    if(c == kOp_BtwsXor)        {dst[0] = '^'; return 1;}
+
+    if(c == kOp_LogicAnd)       {dst[0] = '&'; dst[1] = '&'; return 2;}
+    if(c == kOp_LogicOr)        {dst[0] = '|'; dst[1] = '|'; return 2;}
+    if(c == kOp_ArithPow)       {dst[0] = '*'; dst[1] = '*'; return 2;}
+
+    if(c == kOp_CmpEq)          {dst[0] = '='; dst[1] = '='; return 2;}
+    if(c == kOp_CmpNE)          {dst[0] = '!'; dst[1] = '='; return 2;}
+    if(c == kOp_CmpLE)          {dst[0] = '<'; dst[1] = '='; return 2;}
+    if(c == kOp_CmpGE)          {dst[0] = '>'; dst[1] = '='; return 2;}
+
+    if(c == kOp_BtwsLShift)     {dst[0] = '<'; dst[1] = '<'; return 2;}
+    if(c == kOp_BtwsRShift)     {dst[0] = '>'; dst[1] = '>'; return 2;}
+
+    return 0;
+}
+
 const char *
 mwl_to_str_op( mwl_OpCode_t opCode ) {
     static char buf[32];
-    snprintf(buf, sizeof(buf), "%#x", opCode);
+    char sgn[5] = "\0\0\0\0\0";
+
+    if( kOp_FUnary & opCode ) {
+        mwl_to_str_op_princ(sgn, opCode);
+    } else {
+        int n = 0;
+        if( (kOp_FS_NoLCompl | kOp_FS_LvLCompl) & opCode )
+            sgn[n++] = (kOp_FS_NoLCompl & opCode) ? '!': '.';
+        n += mwl_to_str_op_princ(sgn + n, opCode);
+        if( (kOp_FS_NoRCompl | kOp_FS_LvRCompl) & opCode )
+            sgn[n++] = (kOp_FS_NoRCompl & opCode) ? '!': '.';
+    }
+
+    snprintf(buf, sizeof(buf), "`%s' (%#x)", sgn, opCode);
     return buf;
 }
 
@@ -113,7 +162,20 @@ mwl_infer_type( mwl_TypeCode_t tcA
         return 0x0;
     } else {
         if( kOp_FUnary & opCode ) {
-            // TODO: unary operations
+            if( tcB ) return 0x0;  /* no second operand allowed for unary ops */
+            /* for logic negate, any type is allowed yielding logic type */
+            if( opCode == kOp_LogicNegate ) return mwl_kTpLogic;
+            /* for bitwise negate we only accept integer type */
+            if( opCode == kOp_BtwsNegate ) {
+                if( tcA == mwl_kTpInteger ) return mwl_kTpInteger;
+                return 0x0;
+            }
+            /* for unary arithmetic operators, consider only numerical types */
+            if( opCode == kOp_ArithNegate
+             || opCode == (kOp_ArithAdd | kOp_FUnary) ) {
+                if( tcA == mwl_kTpInteger || tcA == mwl_kTpFloat ) return tcA;
+                return 0x0;
+            }
             return 0x0;
         } else {
             if( kOp_FComparison & opCode ) {
@@ -130,7 +192,7 @@ mwl_infer_type( mwl_TypeCode_t tcA
                     return mwl_kTpLogic;
                 // error of comparsion types
                 snprintf( errBuf, errBufSize
-                        , "can not compare %s with %s by operator `%s'"
+                        , "can not compare `%s' with `%s' types with operator %s"
                         , mwl_to_str_type(tcA)
                         , mwl_to_str_type(tcB)
                         , mwl_to_str_op(opCode)
@@ -144,7 +206,7 @@ mwl_infer_type( mwl_TypeCode_t tcA
                 if( tcA == mwl_kTpInteger && tcB == mwl_kTpInteger )
                     return mwl_kTpInteger;
                 snprintf( errBuf, errBufSize
-                        , "can not apply `%s' bitwise operation on %s and %s"
+                        , "can not apply %s bitwise operation on `%s' and `%s'"
                         , mwl_to_str_op(opCode)
                         , mwl_to_str_type(tcA)
                         , mwl_to_str_type(tcB)
@@ -156,16 +218,16 @@ mwl_infer_type( mwl_TypeCode_t tcA
                 // mixed case and preserve int for the int-only operation
                 if( !(mwl_kFIsNumeric & tcA) ) {
                     snprintf( errBuf, errBufSize
-                            , "left argument of `%s' arithmetic operation is not a"
-                              " number (it is of type %s)"
+                            , "left argument of %s arithmetic operation is not a"
+                              " number (it is of type `%s')"
                             , mwl_to_str_op(opCode)
                             , mwl_to_str_type(tcA)
                             );
                     return 0x0;
                 } else if( !(mwl_kFIsNumeric & tcA) ) {
                     snprintf( errBuf, errBufSize
-                            , "right argument of `%s' arithmetic operation is not a"
-                              " number (it is of type %s)"
+                            , "right argument of %s arithmetic operation is not a"
+                              " number (it is of type `%s')"
                             , mwl_to_str_op(opCode)
                             , mwl_to_str_type(tcB)
                             );

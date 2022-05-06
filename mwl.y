@@ -69,7 +69,7 @@ mwl_mk_AST( char * strexpr
 %token<opCode> T_LOG_BINOP_AND T_LOG_BINOP_OR
 
 %type<astNode> expr logicOr logicAnd bitwiseOr bitwiseXor bitwiseAnd logicNeq
-%type<astNode> gtCmp btwsShift addBinop multBinop expBinop value
+%type<astNode> gtCmp btwsShift addBinop multBinop expBinop negateUnOp unaryOp value
 %type<astNode> foreignVal
 
 %type<argsList> arguments
@@ -143,9 +143,20 @@ mwl_mk_AST( char * strexpr
             | expBinop
             ;
 
-   expBinop : expBinop T_EXP_BINOP value
+   expBinop : expBinop T_EXP_BINOP negateUnOp
             { int rc = mwl_init_op_node(&$$, &$1, $2, &$3, ws); if(rc) return rc; }
-            | T_LBC expr T_RBC {$$ = $2;}
+            | negateUnOp
+            ;
+
+ negateUnOp : T_EXCLMM unaryOp
+            { int rc = mwl_init_op_node(&$$, &$2, kOp_LogicNegate, NULL, ws); if(rc) return rc; }
+            | T_TILDE unaryOp
+            { int rc = mwl_init_op_node(&$$, &$2, kOp_BtwsNegate, NULL, ws); if(rc) return rc; }
+            | unaryOp
+            ;
+
+    unaryOp : T_ADDITIVE_BINOP value
+            { int rc = mwl_init_op_node(&$$, &$2, $1 | kOp_FUnary, NULL, ws); if(rc) return rc; }
             | value
             ;
 
@@ -153,7 +164,9 @@ mwl_mk_AST( char * strexpr
                 $$.pl.asConstVal = $1;
                 $$.dataType = $1.dataType;
                 $$.nodeType = mwl_kConstValue;
+                $$.isVisited = 0;
             }
+            | T_LBC expr T_RBC {$$ = $2;}
             //| foreignCall T_LBC expr T_RBC
             | foreignVal
             ;
@@ -169,6 +182,7 @@ mwl_mk_AST( char * strexpr
                     return MWL_UNRESOLVED_IDENTIFIER_ERROR;
                 }
                 free($1);
+                $$.isVisited = 0;
             }
             | foreignVal T_DOT T_UNKNOWN_IDENTIFIER {
                 if( $1.nodeType != mwl_kNamespace ) {
@@ -190,6 +204,7 @@ mwl_mk_AST( char * strexpr
                     return MWL_UNRESOLVED_IDENTIFIER_ERROR;
                 }
                 free($3);
+                $$.isVisited = 0;
             }
             | foreignVal T_LBC arguments T_RBC {
                 assert($1.nodeType == mwl_kFunction);
@@ -202,6 +217,7 @@ mwl_mk_AST( char * strexpr
                     return MWL_RESULT_TYPE_ERROR;
                 }
                 $$.pl.asFunction.argsList = $3;
+                $$.isVisited = 0;
             }
             //| foreignVal T_LSQBC expr T_RSQBC  // selector
             ;

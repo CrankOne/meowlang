@@ -32,7 +32,10 @@ struct mwl_Op {
 /** Common AST node structure */
 struct mwl_ASTNode {
     enum mwl_NodeType nodeType;
-    mwl_TypeCode_t dataType;
+    /** Data type of this node. Note that highest bit is reserved for
+     * "is visited" flag of algorithms like DFS */
+    mwl_TypeCode_t dataType  : sizeof(mwl_TypeCode_t)*8 - 1;
+    mwl_TypeCode_t isVisited : 1;
     union {
         struct mwl_ConstVal     asConstVal;     /* for kConstValue */
         struct mwl_Op           asOp;           /* for kOperation */
@@ -43,7 +46,7 @@ struct mwl_ASTNode {
     } pl;
 };
 
-/** Places copies of the nodes, infers type, etc */
+/**\brief Places copies of the nodes, infers type, etc */
 int mwl_init_op_node( struct mwl_ASTNode * dest
                     , struct mwl_ASTNode * left
                     , mwl_OpCode_t
@@ -51,19 +54,44 @@ int mwl_init_op_node( struct mwl_ASTNode * dest
                     , struct mwl_Workspace *
                     );
 
-/** Makes shallow copy of the given AST node */
+/**\brief Makes shallow copy of the given AST node */
 struct mwl_ASTNode * mwl_shallow_copy_node(struct mwl_ASTNode *);
 
-/** Resolves symbol by identifier name
+/**\brief Resolves symbol by identifier name
  * 
  * Takes pointer to a `mwl_Definitions` instance (a C++ dictionary of
  * definitions), the name of the identifier and, optionally, a previous
  * identifiers list. */
-int
-mwl_resolve_identifier_to_ast( struct mwl_ASTNode * dest
-          , const struct mwl_Definitions * dict
-          , const char * strtok
-          );
+int mwl_resolve_identifier_to_ast( struct mwl_ASTNode * dest
+                                 , const struct mwl_Definitions * dict
+                                 , const char * strtok );
+
+/*\brief Applies operation to every node recursively*/
+int mwl_AST_for_all_recursively( struct mwl_ASTNode * root
+                               , int (*callback)(struct mwl_ASTNode *, int, void *)
+                               , void * data );
+
+/*\brief Resets `isVisited` flag for all nodes in a subtree*/
+void mwl_AST_reset_visited( struct mwl_ASTNode * root );
+
+/**\brief DFS algorithm on AST, non-recursive
+ *
+ * Note, that pre-order traversal in case of trees is equivalent to topological
+ * sort.
+ * */
+int mwl_AST_dfs( struct mwl_ASTNode * root
+               , int (*callback)(struct mwl_ASTNode *, int, void *)
+               , void * data );
+
+/**\brief Call function on every node in topological order 
+ *
+ * This routine is useful for evaluation and code generation. It applies DFS
+ * algorithm to get the descendant order (preorder traversal), and then
+ * evluates the function in reversed order.
+ * */
+int mwl_AST_for_all_tsorted( struct mwl_ASTNode * root
+                           , int (*callback)(struct mwl_ASTNode *, int, void *)
+                           , void * data );
 
 #ifdef __cplusplus
 }  // extern "C"

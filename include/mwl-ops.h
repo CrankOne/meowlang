@@ -3,6 +3,10 @@
 
 #include "mwl-types.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct mwl_Workspace;
 
 #define M_for_all_opcodes(m, ...) \
@@ -18,16 +22,16 @@ struct mwl_Workspace;
     m( FS_LvRCompl,  (0x11 << 16), __VA_ARGS__ ) /* leave right complement */    \
     /* Logic operator codes */ \
     m( LogicNegate, 1 | kOp_FUnary, __VA_ARGS__ ) \
-    m( LogicAnd,    1, __VA_ARGS__ ) \
-    m( LogicOr,     2, __VA_ARGS__ ) \
+    m( LogicAnd,    2, __VA_ARGS__ ) \
+    m( LogicOr,     3, __VA_ARGS__ ) \
     /* Arithmetic operator codes */ \
     m( ArithNegate, 1 | kOp_FArithmetic | kOp_FUnary, __VA_ARGS__ ) \
-    m( ArithAdd,    1 | kOp_FArithmetic, __VA_ARGS__ ) \
-    m( ArithSub,    2 | kOp_FArithmetic, __VA_ARGS__ ) \
-    m( ArithMult,   3 | kOp_FArithmetic, __VA_ARGS__ ) \
-    m( ArithDiv,    4 | kOp_FArithmetic, __VA_ARGS__ ) \
-    m( ArithPow,    5 | kOp_FArithmetic, __VA_ARGS__ ) \
-    m( ArithModul,  6 | kOp_FArithmetic, __VA_ARGS__ ) \
+    m( ArithSub,    1 | kOp_FArithmetic, __VA_ARGS__ ) \
+    m( ArithAdd,    2 | kOp_FArithmetic, __VA_ARGS__ ) \
+    m( ArithMult,   4 | kOp_FArithmetic, __VA_ARGS__ ) \
+    m( ArithDiv,    5 | kOp_FArithmetic, __VA_ARGS__ ) \
+    m( ArithPow,    6 | kOp_FArithmetic, __VA_ARGS__ ) \
+    m( ArithModul,  7 | kOp_FArithmetic, __VA_ARGS__ ) \
     /* Comparison operator codes */ \
     m( CmpEq,       1 | kOp_FComparison, __VA_ARGS__ ) \
     m( CmpNE,       2 | kOp_FComparison, __VA_ARGS__ ) \
@@ -63,6 +67,10 @@ mwl_infer_type( mwl_TypeCode_t tcA
               , char * errBuf
               , size_t errBufSize
               );
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif
 
 #endif  /* H_MWL_OPERATIONS_H */
 

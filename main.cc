@@ -3,6 +3,30 @@
 #include "mwl.tab.h"
 #include "mwl-ast-print.h"
 
+static int
+_print_node( struct mwl_ASTNode * node
+           , int depth
+           , void * data
+           ) {
+    char bf[128], bf1[64];
+    if(mwl_kConstValue == node->nodeType) {
+        mwl_to_str_constval(bf1, sizeof(bf1), &(node->pl.asConstVal));
+        snprintf( bf, sizeof(bf), "%s %p"
+                , bf1
+                , node );
+    } else if(mwl_kOperation == node->nodeType) {
+        snprintf( bf, sizeof(bf), "%s %s %p"
+                , mwl_to_str_op(node->pl.asOp.code)
+                , mwl_to_str_type(node->dataType)
+                , node );
+    } else {
+        snprintf( bf, sizeof(bf), "%p", node );
+    }
+    puts(bf);
+    return 0;
+}
+
+
 int
 main(int argc, char * argv[]) {
     mwl_Definitions defs;
@@ -16,7 +40,8 @@ main(int argc, char * argv[]) {
                                   , stdout  /* debug stream */
                                   );
     if( ast ) {
-        mwl_dump_AST(stdout, ast, 2);
+        mwl_dump_AST(stdout, ast, 1);
+        mwl_AST_for_all_tsorted( ast, _print_node, NULL );
     }
     return 0;
 }

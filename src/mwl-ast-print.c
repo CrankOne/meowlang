@@ -3,52 +3,138 @@
 #include "mwl-types.h"
 #include "mwl-ops.h"
 
+#include <assert.h>
+#include <string.h>
+
 size_t
 mwl_to_str_constval( char * buf
                    , size_t n
                    , const struct mwl_ConstVal * obj
                    ) {
     if( obj->dataType == mwl_kTpLogic )
-        return snprintf(buf, n, "%s", obj->pl.asInteger ? "true" : "false");
+        return snprintf(buf, n, "%s:bool", obj->pl.asInteger ? "true" : "false");
     if( obj->dataType == mwl_kTpInteger )
-        return snprintf(buf, n, "%ld", (long int) obj->pl.asInteger );
+        return snprintf(buf, n, "%ld:int", (long int) obj->pl.asInteger );
     if( obj->dataType == mwl_kTpFloat )
-        return snprintf(buf, n, "%f", (double) obj->pl.asFloat );
+        return snprintf(buf, n, "%e:float", (double) obj->pl.asFloat );
     if( obj->dataType == mwl_kTpString )
-        return snprintf(buf, n, "\"%s\"", obj->pl.asString );
-    return snprintf(buf, n, "???" );  // TODO: hex dump of data
+        return snprintf(buf, n, "\"%s\":str", obj->pl.asString );
+    return snprintf(buf, n, "???:%#x", (int) obj->dataType );  // TODO: hex dump of data
+}
+
+#if 1
+static void
+_impl_mwl_dump_AST( FILE * stream
+                  , const struct mwl_ASTNode * node
+                  , int depth
+                  , char * prefix
+                  ) {
+    fputs(prefix, stream);
+    for( char * c = prefix; *c != '\0'; ++c ) if('`' == *c) *c = ' ';
+    if(!node) {
+        fputs("(null node)\n", stream);
+        return;
+    }
+    //char * endPtr = prefix + strlen(prefix);
+    char nodeDumpBuf[128];
+    switch( node->nodeType ) {
+        case mwl_kConstValue:
+            fputs("- ", stream);
+            mwl_to_str_constval(nodeDumpBuf, sizeof(nodeDumpBuf), &(node->pl.asConstVal));
+            fputs(nodeDumpBuf, stream);
+            fputc('\n', stream);
+            return;
+        break;
+        case mwl_kOperation:
+            fprintf( stream, "+- \033[7m%s\033[0m <%s>\n"
+                   , mwl_to_str_op(node->pl.asOp.code)
+                   , mwl_to_str_type(node->dataType)
+                   );
+            if(depth) {
+                strcat(prefix, node->pl.asOp.b ? "|" : "`");
+                _impl_mwl_dump_AST(stream, node->pl.asOp.a, depth + 1, prefix);
+                prefix[strlen(prefix)-1] = '\0';
+            }
+            if(node->pl.asOp.b && depth) {
+                strcat(prefix, "`");
+                _impl_mwl_dump_AST(stream, node->pl.asOp.b, depth + 1, prefix);
+                prefix[strlen(prefix)-1] = '\0';
+            }
+            return;  // goto end?
+        break;
+        default:
+            fprintf(stream, "%p", node);
+        // ...
+    };
+    fprintf(stream, " <%s>\n", mwl_to_str_type(node->dataType));
+}
+
+void
+mwl_dump_AST( FILE * stream
+            , const struct mwl_ASTNode * node
+            , int depth
+            ) {
+    char prefix[128] = "";
+    _impl_mwl_dump_AST(stream, node, depth, prefix);
+}
+#endif
+
+#if 0
+struct ReentrantPrintObject {
+    char prefix[512];  /* TODO: configurable parameter */
+    char * prefixEnd;
+    FILE * dest;
+};
+
+static int
+_print_node( struct mwl_ASTNode * node
+            , int depth
+            , void * data
+            ) {
+    struct ReentrantPrintObject * rpo = (struct ReentrantPrintObject *) data;
+    fputs(rpo->prefix, rpo->dest);
+    //fprintf(rpo->dest, "[%d] ", depth);
+    switch( node->nodeType ) {
+        case mwl_kOperation:
+        case mwl_kFunction:
+            fputc('+', rpo->dest);
+            *(rpo->prefixEnd) = '|';
+            *(++(rpo->prefixEnd)) = '\0';
+            if( node->nodeType == mwl_kOperation ) {
+                fprintf( rpo->dest, "op:`%s' <%s>"
+                       , mwl_to_str_op(node->pl.asOp.code)
+                       , mwl_to_str_type(node->dataType)
+                       );
+            } else {
+                fprintf( rpo->dest, "<func>"  // TODO ...
+                       );
+            }
+            break;
+        /* ... add other composite nodes here  */
+        case mwl_kConstValue:
+        case mwl_kParameter:
+        case mwl_kVariable:
+        case mwl_kNamespace:
+            fputc('-', rpo->dest);
+    };
+    //++(rpo->prefixEnd);
+    //assert(rpo->prefixEnd >= rpo->prefix);
+    //*(rpo->prefixEnd) = '\0';
+    fputc('\n', rpo->dest);
+    return 0;
 }
 
 void
 mwl_dump_AST( FILE * stream
             , const struct mwl_ASTNode * node
             , int indent
+            , int depth
             ) {
-    fprintf(stream, "%*c", indent, ' ');
-    if(!node) {
-        fprintf(stream, "(null node)\n");
-        return;
-    }
-    char nodeDumpBuf[128];
-    switch( node->nodeType ) {
-        case mwl_kConstValue: {
-            mwl_to_str_constval(nodeDumpBuf, sizeof(nodeDumpBuf), &(node->pl.asConstVal));
-            fprintf(stream, "constval:%s", nodeDumpBuf);
-        break; };
-        case mwl_kOperation: {
-            fprintf( stream, "op:`%s' <%s>\n"
-                   , mwl_to_str_op(node->pl.asOp.code)
-                   , mwl_to_str_type(node->dataType)
-                   );
-            mwl_dump_AST(stream, node->pl.asOp.a, indent + 2);
-            if(node->pl.asOp.b)
-                mwl_dump_AST(stream, node->pl.asOp.b, indent + 2);
-            return;  // goto end?
-        break; };
-        default:
-            fprintf(stream, "%p\n", node);
-        // ...
-    };
-    fprintf(stream, " <%s>\n", mwl_to_str_type(node->dataType));
+    struct ReentrantPrintObject rpo = { "", NULL, stream };
+    rpo.prefixEnd = rpo.prefix;
+    mwl_AST_for_all_recursively( (struct mwl_ASTNode *) node
+                               , _print_node
+                               , &rpo );
 }
+#endif
 
