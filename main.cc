@@ -40,8 +40,22 @@ main(int argc, char * argv[]) {
                                   , stdout  /* debug stream */
                                   );
     if( ast ) {
+        fputs("AST tree dump:\n", stdout);
         mwl_dump_AST(stdout, ast, 1);
+
+        fputs("\nTopological sort result:\n", stdout);
         mwl_AST_for_all_tsorted( ast, _print_node, NULL );
+
+        fputs("\nEvaluation result:\n", stdout);
+        struct mwl_ConstVal evalResult;
+        int rc = mwl_AST_eval(ast, &evalResult);
+        if( 0 == rc ) {
+            char bf[64];
+            mwl_to_str_constval(bf, sizeof(bf), &evalResult);
+            fputs(" => ", stdout);
+            fputs(bf, stdout);
+            fputc('\n', stdout);
+        }
     }
     return 0;
 }

@@ -8,6 +8,7 @@ extern "C" {
 #endif
 
 struct mwl_Workspace;
+struct mwl_ConstVal;
 
 #define M_for_all_opcodes(m, ...) \
     /* Features flags */ \
@@ -58,6 +59,16 @@ mwl_OpCode_t mwl_to_opcode( const char * expr, struct mwl_Workspace * ws );
 
 /** Returns string representing an operator */
 const char * mwl_to_str_op(mwl_OpCode_t);
+
+#ifndef NO_PLAIN_EVAL
+typedef int (*mwl_PlainNodeEvaluator)( const struct mwl_ConstVal *
+                                     , const struct mwl_ConstVal * 
+                                     , struct mwl_ConstVal *
+                                     );
+
+mwl_PlainNodeEvaluator
+mwl_op_get_plain_eval( mwl_OpCode_t opCode );
+#endif
 
 /** Deduces data type based on operation and operand types */
 mwl_TypeCode_t

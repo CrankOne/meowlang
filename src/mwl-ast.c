@@ -13,6 +13,7 @@ mwl_shallow_copy_node(struct mwl_ASTNode * node) {
     struct mwl_ASTNode * result = malloc(sizeof(struct mwl_ASTNode));
     memcpy(result, node, sizeof(struct mwl_ASTNode));
     node->isVisited = 0;
+    node->userdata = NULL;
     return result;
 }
 
@@ -264,3 +265,85 @@ mwl_AST_for_all_tsorted( struct mwl_ASTNode * root
     return rc;
 }
 
+#ifndef NO_PLAIN_EVAL
+/*                                                          ___________________
+ * _______________________________________________________/ Plain evaluation */
+
+struct ReentrantEvaluationObject {
+    struct mwl_ConstVal * result;
+};
+
+static int
+_plain_eval_op( struct mwl_ASTNode * node
+              , void * reo_ ) {
+    assert(node->nodeType == mwl_kOperation);
+    struct mwl_Op * op = &(node->pl.asOp);
+    struct ReentrantEvaluationObject * reo
+            = (struct ReentrantEvaluationObject *) reo_;
+    /* Find plain evaluator function for the operation. Note, that this
+     * evaluator have to be applied to scalar nodes, even if provided op code
+     * is on-set operation */
+    mwl_PlainNodeEvaluator evaluator
+        = mwl_op_get_plain_eval(op->code);
+    
+    /* For operands, take either constval node directly, or rely on `userdata'
+     * for the result of previously computed expressions */
+    assert( op->a );
+    assert( op->a->nodeType == mwl_kConstValue || NULL != op->a->userdata );
+    struct mwl_ConstVal * a = op->a->nodeType == mwl_kConstValue
+                            ? &(op->a->pl.asConstVal)
+                            : (struct mwl_ConstVal *) op->a->userdata
+                            ;
+    assert(a);
+    struct mwl_ConstVal * b = NULL;
+    if(op->b) {
+        assert( op->b->nodeType == mwl_kConstValue || NULL != op->b->userdata );
+        b = op->b->nodeType == mwl_kConstValue
+          ? &(op->b->pl.asConstVal)
+          : (struct mwl_ConstVal *) op->b->userdata
+          ;
+        assert(b);
+    }
+    struct mwl_ConstVal * r = malloc(sizeof(struct mwl_ConstVal));
+    memset(r, 0x0, sizeof(struct mwl_ConstVal));
+    int rc = evaluator(a, b, r);
+    if(rc) {
+        /* TODO: put details in reo */
+        return rc;
+    }
+    if( r->dataType != node->dataType ) {
+        /* TODO: put details in reo */
+        return -100;
+    }
+    node->userdata = r;
+    return 0;
+}
+
+static int
+_plain_eval_ast( struct mwl_ASTNode * node
+               , int depth
+               , void * reo_
+               ) {
+    /* skip constval nodes */
+    if(node->nodeType == mwl_kConstValue) return 0;
+    if(node->nodeType == mwl_kOperation)
+        return _plain_eval_op(node, reo_);
+    return 1;  /* unimplemented node? */
+}
+
+int
+mwl_AST_eval( struct mwl_ASTNode * root
+            , struct mwl_ConstVal * result
+            ) {
+    struct ReentrantEvaluationObject reo = {result};
+    int rc = mwl_AST_for_all_tsorted( root
+                                    , _plain_eval_ast
+                                    , &reo);
+    if(0 == rc) {
+        assert(root->userdata);
+        *result = *((struct mwl_ConstVal *) root->userdata);
+    }
+    /* TODO free userdata fields recursively here */
+    return rc;
+}
+#endif  /* NO_PLAIN_EVAL */

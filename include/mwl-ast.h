@@ -44,6 +44,7 @@ struct mwl_ASTNode {
         struct mwl_Variable     asVariable;     /* for kVariable */
         struct mwl_Definitions* asNamespace;    /* for kDefinitions */
     } pl;
+    void * userdata;
 };
 
 /**\brief Places copies of the nodes, infers type, etc */
@@ -92,6 +93,16 @@ int mwl_AST_dfs( struct mwl_ASTNode * root
 int mwl_AST_for_all_tsorted( struct mwl_ASTNode * root
                            , int (*callback)(struct mwl_ASTNode *, int, void *)
                            , void * data );
+
+#ifndef NO_PLAIN_EVAL
+/**\brief Evaluates the AST
+ *
+ * Tries to evaluate the AST to a value.
+ * */
+int mwl_AST_eval( struct mwl_ASTNode * root
+                , struct mwl_ConstVal * result
+                );
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -165,6 +165,7 @@ mwl_mk_AST( char * strexpr
                 $$.dataType = $1.dataType;
                 $$.nodeType = mwl_kConstValue;
                 $$.isVisited = 0;
+                $$.userdata = 0;
             }
             | T_LBC expr T_RBC {$$ = $2;}
             //| foreignCall T_LBC expr T_RBC
@@ -183,6 +184,7 @@ mwl_mk_AST( char * strexpr
                 }
                 free($1);
                 $$.isVisited = 0;
+                $$.userdata = NULL;
             }
             | foreignVal T_DOT T_UNKNOWN_IDENTIFIER {
                 if( $1.nodeType != mwl_kNamespace ) {
@@ -205,6 +207,7 @@ mwl_mk_AST( char * strexpr
                 }
                 free($3);
                 $$.isVisited = 0;
+                $$.userdata = NULL;
             }
             | foreignVal T_LBC arguments T_RBC {
                 assert($1.nodeType == mwl_kFunction);
@@ -218,6 +221,7 @@ mwl_mk_AST( char * strexpr
                 }
                 $$.pl.asFunction.argsList = $3;
                 $$.isVisited = 0;
+                $$.userdata = 0;
             }
             //| foreignVal T_LSQBC expr T_RSQBC  // selector
             ;
