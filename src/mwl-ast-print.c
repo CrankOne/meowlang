@@ -36,19 +36,19 @@ _impl_mwl_dump_AST( FILE * stream
         return;
     }
     //char * endPtr = prefix + strlen(prefix);
-    char nodeDumpBuf[128];
+    char buf[128];
     switch( node->nodeType ) {
         case mwl_kConstValue:
             fputs("- ", stream);
-            mwl_to_str_constval(nodeDumpBuf, sizeof(nodeDumpBuf), &(node->pl.asConstVal));
-            fputs(nodeDumpBuf, stream);
+            mwl_to_str_constval(buf, sizeof(buf), &(node->pl.asConstVal));
+            fputs(buf, stream);
             fputc('\n', stream);
             return;
         break;
         case mwl_kOperation:
             fprintf( stream, "+- \033[7m%s\033[0m <%s>\n"
                    , mwl_to_str_op(node->pl.asOp.code)
-                   , mwl_to_str_type(node->dataType)
+                   , mwl_to_str_type(buf, sizeof(buf), node->dataType)
                    );
             if(depth) {
                 strcat(prefix, node->pl.asOp.b ? "|" : "`");
@@ -66,7 +66,7 @@ _impl_mwl_dump_AST( FILE * stream
             fprintf(stream, "%p", node);
         // ...
     };
-    fprintf(stream, " <%s>\n", mwl_to_str_type(node->dataType));
+    fprintf(stream, " <%s>\n", mwl_to_str_type(buf, sizeof(buf), node->dataType));
 }
 
 void

@@ -24,6 +24,7 @@ mwl_init_op_node( struct mwl_ASTNode * dest
                 , struct mwl_ASTNode * right
                 , struct mwl_Workspace * ws
                 ) {
+    char buf1[64], buf2[64];
     mwl_OpCode_t tp = mwl_infer_type( left->dataType, opCode
                                     , right ? right->dataType : 0x0
                                     , ws->errMsg, ws->errMsgSize );
@@ -35,7 +36,7 @@ mwl_init_op_node( struct mwl_ASTNode * dest
                         , "failed to infer resulting type of the unary"
                           " operation %s with operand type `%s'"
                         , mwl_to_str_op(opCode)
-                        , mwl_to_str_type(left->dataType)
+                        , mwl_to_str_type(buf1, sizeof(buf1), left->dataType)
                         );
             } else {
                 assert(right);
@@ -43,8 +44,8 @@ mwl_init_op_node( struct mwl_ASTNode * dest
                         , "failed to infer resulting type of the binary"
                           " operation %s with operands types `%s' and `%s'"
                         , mwl_to_str_op(opCode)
-                        , mwl_to_str_type(left->dataType)
-                        , mwl_to_str_type(right->dataType)
+                        , mwl_to_str_type(buf1, sizeof(buf1), left->dataType)
+                        , mwl_to_str_type(buf2, sizeof(buf2), right->dataType)
                         );
             }
         }

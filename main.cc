@@ -15,9 +15,10 @@ _print_node( struct mwl_ASTNode * node
                 , bf1
                 , node );
     } else if(mwl_kOperation == node->nodeType) {
+        char tpBf[64];
         snprintf( bf, sizeof(bf), "%s %s %p"
                 , mwl_to_str_op(node->pl.asOp.code)
-                , mwl_to_str_type(node->dataType)
+                , mwl_to_str_type(tpBf, sizeof(tpBf), node->dataType)
                 , node );
     } else {
         snprintf( bf, sizeof(bf), "%p", node );

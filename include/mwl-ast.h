@@ -3,6 +3,7 @@
 
 #include "mwl-defs.h"
 #include "mwl-func.h"
+#include "mwl-ops.h"
 
 #include <stdio.h>
 

@@ -160,6 +160,7 @@ mwl_infer_type( mwl_TypeCode_t tcA
               , char * errBuf
               , size_t errBufSize
               ) {
+    char buf1[64], buf2[64];
     if( (opCode & (0x1 << 16)) /* if op code implies map/set/string type */
      || (tcA & (0x1 << 10)) || (tcB & (0x1 << 10))  /* or at least one of the operands */
       ) {
@@ -198,8 +199,8 @@ mwl_infer_type( mwl_TypeCode_t tcA
                 // error of comparsion types
                 snprintf( errBuf, errBufSize
                         , "can not compare `%s' with `%s' types with operator %s"
-                        , mwl_to_str_type(tcA)
-                        , mwl_to_str_type(tcB)
+                        , mwl_to_str_type(buf1, sizeof(buf1), tcA)
+                        , mwl_to_str_type(buf2, sizeof(buf2), tcB)
                         , mwl_to_str_op(opCode)
                         );
                 return 0x0;
@@ -213,8 +214,8 @@ mwl_infer_type( mwl_TypeCode_t tcA
                 snprintf( errBuf, errBufSize
                         , "can not apply %s bitwise operation on `%s' and `%s'"
                         , mwl_to_str_op(opCode)
-                        , mwl_to_str_type(tcA)
-                        , mwl_to_str_type(tcB)
+                        , mwl_to_str_type(buf1, sizeof(buf1), tcA)
+                        , mwl_to_str_type(buf2, sizeof(buf2), tcB)
                         );
                 return 0x0;
             }  // bitwise operation
@@ -226,7 +227,7 @@ mwl_infer_type( mwl_TypeCode_t tcA
                             , "left argument of %s arithmetic operation is not a"
                               " number (it is of type `%s')"
                             , mwl_to_str_op(opCode)
-                            , mwl_to_str_type(tcA)
+                            , mwl_to_str_type(buf1, sizeof(buf1), tcA)
                             );
                     return 0x0;
                 } else if( !(mwl_kFIsNumeric & tcA) ) {
@@ -234,7 +235,7 @@ mwl_infer_type( mwl_TypeCode_t tcA
                             , "right argument of %s arithmetic operation is not a"
                               " number (it is of type `%s')"
                             , mwl_to_str_op(opCode)
-                            , mwl_to_str_type(tcB)
+                            , mwl_to_str_type(buf1, sizeof(buf1), tcB)
                             );
                     return 0x0;
                 }

@@ -7,6 +7,9 @@
 extern "C" {
 #endif
 
+/** Integer type used to identify operations */
+typedef uint32_t mwl_OpCode_t;
+
 struct mwl_Workspace;
 struct mwl_ConstVal;
 
