@@ -23,6 +23,7 @@ mwl.a: build/mwl-ast-print.o \
 	 build/mwl-ops.o \
 	 build/mwl-types.o \
 	 build/mwl-ws.o \
+	 build/mwl-set.o \
 	 build/mwl.tab.o \
 	 build/lex.yy.o
 	ar rcs $@ $^

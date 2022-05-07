@@ -29,7 +29,7 @@ M           [.!]
 
 [ \t\n]         ; // ignore all whitespaces
 
--?[0-9]+        {   long val = strtol( yytext, NULL, 0 );
+[0-9]+        {   long val = strtol( yytext, NULL, 0 );
                     if( val > MWL_INTEGER_MAX || val < MWL_INTEGER_MIN ) {
                         mwl_error( yylloc, ws, yyscanner
                                  , "integer value is out of permitted range" );
@@ -39,7 +39,7 @@ M           [.!]
                     yylval->constval.dataType = mwl_kTpInteger;
                     return T_CONSTVAL_TOKEN;
                 }
-[-+]?{D}*\.?{D}+([eE][-+]?{D}+)? {
+{D}*\.?{D}+([eE][-+]?{D}+)? {
                   char * endptr = NULL;
                   double v = strtod(yytext, &endptr);
                   if( (!endptr) || '\0' != *endptr ) return T_INVALID_VALUE;
@@ -81,12 +81,15 @@ M           [.!]
 
 "("                 { return T_LBC;}
 ")"                 { return T_RBC;}
+"{"                 { return T_LCRLBC; }
+"}"                 { return T_RCRLBC; }
 "["                 { return T_LSQBC;}
 "]"                 { return T_RSQBC;}
 "~"                 { return T_TILDE;}
 "!"                 { return T_EXCLMM;}
 "."                 { return T_DOT;}
 ","                 { return T_COMMA;}
+":"                 { return T_COLON; }
 
 \"(\\.|[^"\\])*\"   { return T_STRING_LITERAL; /*TODO: copy*/ }
 {L}({L}|{D})*       { yylval->strID = strdup( yytext );

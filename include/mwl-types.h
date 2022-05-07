@@ -52,7 +52,7 @@ typedef int32_t mwl_Integer_t;
 typedef float mwl_Float_t;
 
 /* Type code features: */
-extern const mwl_TypeCode_t mwl_kFIsForegn;
+extern const mwl_TypeCode_t mwl_kFIsForeign;
 extern const mwl_TypeCode_t mwl_kFIsScalar;
 extern const mwl_TypeCode_t mwl_kFIsNumeric;
 extern const mwl_TypeCode_t mwl_kFIsFloat;
@@ -69,6 +69,12 @@ extern const mwl_TypeCode_t mwl_kTpString;
 /* ... other types? map, set, etc */
 
 char * mwl_to_str_type( char *, size_t, mwl_TypeCode_t );
+
+/** Combines key and value type into a single type descriptor */
+mwl_TypeCode_t
+mwl_combine_map_type( mwl_TypeCode_t keyType
+                    , mwl_TypeCode_t valType
+                    );
 
 #ifdef __cplusplus
 }  // extern "C"

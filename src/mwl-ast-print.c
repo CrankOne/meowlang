@@ -19,7 +19,7 @@ mwl_to_str_constval( char * buf
         return snprintf(buf, n, "%e:float", (double) obj->pl.asFloat );
     if( obj->dataType == mwl_kTpString )
         return snprintf(buf, n, "\"%s\":str", obj->pl.asString );
-    return snprintf(buf, n, "???:%#x", (int) obj->dataType );  // TODO: hex dump of data
+    return snprintf(buf, n, "???:(type#%#x)", (int) obj->dataType );  // TODO: hex dump of data
 }
 
 #if 1
@@ -44,9 +44,9 @@ _impl_mwl_dump_AST( FILE * stream
             fputs(buf, stream);
             fputc('\n', stream);
             return;
-        break;
+
         case mwl_kOperation:
-            fprintf( stream, "+- \033[7m%s\033[0m <%s>\n"
+            fprintf( stream, "+- %s:%s\n"
                    , mwl_to_str_op(node->pl.asOp.code)
                    , mwl_to_str_type(buf, sizeof(buf), node->dataType)
                    );
@@ -61,9 +61,52 @@ _impl_mwl_dump_AST( FILE * stream
                 prefix[strlen(prefix)-1] = '\0';
             }
             return;  // goto end?
-        break;
-        default:
-            fprintf(stream, "%p", node);
+
+        case mwl_kSet:
+            fprintf( stream, "+- %s\n"
+                   , mwl_to_str_type(buf, sizeof(buf), node->dataType)
+                   );
+            if(depth) {
+                strcat(prefix, node->pl.asSet.values.next ? "|" : "`");
+                for( const struct mwl_ArgsList * c = &(node->pl.asSet.values)
+                   ; c
+                   ; c = c->next ) {
+                    if( ! c->next )
+                        prefix[strlen(prefix)-1] = '`';
+                    _impl_mwl_dump_AST(stream, c->self, depth + 1, prefix);
+                }
+                prefix[strlen(prefix)-1] = '\0';
+            }
+            return;
+
+        case mwl_kMap:
+            fprintf( stream, "+- %s\n"
+                   , mwl_to_str_type(buf, sizeof(buf), node->dataType)
+                   );
+            if(depth) {
+                size_t n = 0;
+                strcat(prefix, node->pl.asMap.values.next ? "|" : "`");
+                for( const struct mwl_MapPairList * c = &(node->pl.asMap.values)
+                   ; c
+                   ; c = c->next, ++n ) {
+                    if( ! c->next )
+                        prefix[strlen(prefix)-1] = '`';
+                    fprintf(stream, "%s+- (node #%zu)\n", prefix, n+1);
+                    for( char * c = prefix; *c != '\0'; ++c ) if('`' == *c) *c = ' ';
+                    strcat(prefix, "|" );
+                    _impl_mwl_dump_AST(stream, c->key,   depth + 1, prefix);
+                    prefix[strlen(prefix)-1] = '`';
+                    _impl_mwl_dump_AST(stream, c->value, depth + 1, prefix);
+                    prefix[strlen(prefix)-1] = '\0';
+                }
+                prefix[strlen(prefix)-1] = '\0';
+            }
+            return;
+
+        //#ifdef NDEBUG
+        //default:
+        //    fprintf(stream, "%p", node);
+        //#endif
         // ...
     };
     fprintf(stream, " <%s>\n", mwl_to_str_type(buf, sizeof(buf), node->dataType));

@@ -162,9 +162,17 @@ mwl_infer_type( mwl_TypeCode_t tcA
               ) {
     char buf1[64], buf2[64];
     if( (opCode & (0x1 << 16)) /* if op code implies map/set/string type */
-     || (tcA & (0x1 << 10)) || (tcB & (0x1 << 10))  /* or at least one of the operands */
-      ) {
-        // TODO: a set or string type
+     || (tcA & (mwl_kFIsCollection | mwl_kFIsForeign))
+     || (tcB & (mwl_kFIsCollection | mwl_kFIsForeign))  /* or at least one of the operands */
+     ) {
+        #warning "TODO: type for operations on collections"
+        snprintf( errBuf, errBufSize
+                , "An operation on collections of types `%s' and `%s' with operator %s"
+                  " is not yet implemented (TODO stub)"
+                , mwl_to_str_type(buf1, sizeof(buf1), tcA)
+                , mwl_to_str_type(buf2, sizeof(buf2), tcB)
+                , mwl_to_str_op(opCode)
+                );  // TODO
         return 0x0;
     } else {
         if( kOp_FUnary & opCode ) {

@@ -3,13 +3,13 @@
 #include <stdio.h>
 #include <string.h>
 
-const mwl_TypeCode_t mwl_kFIsForegn         = 0x1;
+const mwl_TypeCode_t mwl_kFIsForeign        = 0x1;
 const mwl_TypeCode_t mwl_kFIsScalar         = 0x1 << 1;
 const mwl_TypeCode_t mwl_kFIsNumeric        = 0x1 << 2;
 const mwl_TypeCode_t mwl_kFIsFloat          = 0x1 << 3;
 const mwl_TypeCode_t mwl_kFIsCollection     = 0x1 << 4;
 const mwl_TypeCode_t mwl_kFIsMap            = 0x1 << 5;
-const mwl_TypeCode_t mwl_kMScalarType       = ~( mwl_kFIsForegn
+const mwl_TypeCode_t mwl_kMScalarType       = ~( mwl_kFIsForeign
                                                | mwl_kFIsScalar
                                                | mwl_kFIsNumeric
                                                | mwl_kFIsFloat
@@ -31,26 +31,35 @@ mwl_to_str_type( char * bf
     if( mwl_kTpFloat == code )      return strncpy(bf, "float", bl);
     if( mwl_kTpString == code )     return strncpy(bf, "string", bl);
 
-    if( mwl_kFIsForegn & code ) {
+    if( mwl_kFIsForeign & code ) {
         snprintf(bf, bl, "foreign#%03d", code);
-    } else if( mwl_kFIsCollection ) {
+    } else if( mwl_kFIsCollection & code ) {
         if( mwl_kFIsMap & code ) {
             char keyBuf[32]
                , valBuf[32];
             snprintf( bf, bl, "{%s:%s}"
-                    , mwl_to_str_type( keyBuf, sizeof(keyBuf), code >> 8   )
-                    , mwl_to_str_type( valBuf, sizeof(valBuf), 0xff & code )
+                    , mwl_to_str_type( valBuf, sizeof(valBuf), 0xff & code & ~(mwl_kFIsCollection | mwl_kFIsMap) )
+                    , mwl_to_str_type( keyBuf, sizeof(keyBuf), code >> 8 )
                     );
         } else {
             char valBuf[32];
             snprintf( bf, bl
                     , "{%s}"
-                    , mwl_to_str_type(valBuf, sizeof(valBuf), code & (~mwl_kFIsCollection))
+                    , mwl_to_str_type(valBuf, sizeof(valBuf), code & ~(mwl_kFIsCollection))
                     );
         }
     } else {
         snprintf(bf, bl, "?%#x?", code);
     }
     return bf;
+}
+
+mwl_TypeCode_t
+mwl_combine_map_type( mwl_TypeCode_t keyType
+                    , mwl_TypeCode_t valType
+                    ) {
+    return (keyType | (mwl_kFIsMap | mwl_kFIsCollection))
+         | (valType << 8)
+         ;
 }
 

@@ -131,6 +131,26 @@ _impl_mwl_AST_for_all_recursively( int depth
                     return rc;
             }
             return 0;
+        case mwl_kSet:
+            /* Iterate over elements of the set */
+            for( struct mwl_ArgsList * c = &(root->pl.asSet.values)
+               ; c && c->self
+               ; c = c->next ) {
+                if((rc = _impl_mwl_AST_for_all_recursively(depth+1, c->self, callback, data)))
+                    return rc;
+            }
+            return 0;
+        case mwl_kMap:
+            /* Iterate over elements of the map */
+            for( struct mwl_MapPairList * c = &(root->pl.asMap.values)
+               ; c
+               ; c = c->next ) {
+                if((rc = _impl_mwl_AST_for_all_recursively(depth+1, c->key, callback, data)))
+                    return rc;
+                if((rc = _impl_mwl_AST_for_all_recursively(depth+1, c->value, callback, data)))
+                    return rc;
+            }
+            return 0;
         /* ... add other composite nodes here  */
         case mwl_kConstValue:
         case mwl_kParameter:

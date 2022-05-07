@@ -54,6 +54,7 @@ mwl_mk_AST( char * strexpr
     struct mwl_ConstVal      constval;
     struct mwl_ASTNode       astNode;
     struct mwl_ArgsList      argsList;
+    struct mwl_MapPairList   mapPairsList;
     /* ... */
 }
 
@@ -61,7 +62,7 @@ mwl_mk_AST( char * strexpr
 
 %token<strID> L_STR
 %token T_LBC T_RBC T_LSQBC T_RSQBC T_LCRLBC T_RCRLBC
-%token T_DOT T_COMMA T_REV_SLASH T_TILDE T_EXCLMM
+%token T_DOT T_COMMA T_REV_SLASH T_TILDE T_EXCLMM T_COLON
 
 %token<opCode> T_EXP_BINOP T_MULTIPLIC_BINOP T_ADDITIVE_BINOP T_BTWS_SHIFT
 %token<opCode> T_LG_COMPARISON T_NEQ_COMPARISON
@@ -73,6 +74,7 @@ mwl_mk_AST( char * strexpr
 %type<astNode> foreignVal
 
 %type<argsList> arguments
+%type<mapPairsList> mapValues
 
 %token T_INVALID_VALUE T_INVALID_OPERATOR T_FOREIGN_VALUE T_FOREIGN_CALL
 %token<constval> T_CONSTVAL_TOKEN T_STRING_LITERAL
@@ -167,6 +169,28 @@ mwl_mk_AST( char * strexpr
                 $$.isVisited = 0;
                 $$.userdata = 0;
             }
+            | T_LCRLBC arguments T_RCRLBC {  // a set
+                $$.nodeType = mwl_kSet;
+                $$.pl.asSet.dataType = mwl_induce_set_type(&($2), ws);
+                if( ! $$.pl.asSet.dataType ) {
+                    yyerror( &yylloc, ws, NULL, "Failed to infer set type." );
+                    return MWL_RESULT_TYPE_ERROR;
+                }
+                $$.pl.asSet.dataType |= mwl_kFIsCollection;
+                $$.dataType = $$.pl.asSet.dataType;
+                $$.pl.asSet.values = $2;
+            }
+            | T_LCRLBC mapValues T_RCRLBC {
+                $$.nodeType = mwl_kMap;
+                $$.pl.asMap.dataType = mwl_induce_map_type(&($2), ws);
+                if( ! $$.pl.asMap.dataType ) {
+                    yyerror( &yylloc, ws, NULL, "Failed to infer associative array type." );
+                    return MWL_RESULT_TYPE_ERROR;
+                }
+                $$.pl.asMap.dataType |= mwl_kFIsCollection | mwl_kFIsMap;
+                $$.dataType = $$.pl.asMap.dataType;
+                $$.pl.asMap.values = $2;
+            }
             | T_LBC expr T_RBC {$$ = $2;}
             //| foreignCall T_LBC expr T_RBC
             | foreignVal
@@ -223,7 +247,27 @@ mwl_mk_AST( char * strexpr
                 $$.isVisited = 0;
                 $$.userdata = 0;
             }
-            //| foreignVal T_LSQBC expr T_RSQBC  // selector
+            | foreignVal T_LSQBC expr T_RSQBC {
+                char bf[256], bf1[64];
+                /* Selectors are available for collections and foreign
+                 * values only */
+                if( mwl_kFIsForeign & $1.dataType ) {
+                    yyerror(&yylloc, ws, NULL, "TODO: foreign type selectors"
+                        " are not yet implemented.");  // TODO
+                    return MWL_RESULT_TYPE_ERROR;
+                } else if( mwl_kFIsCollection & $1.dataType ) {
+                    yyerror(&yylloc, ws, NULL, "TODO: collection selectors"
+                        " are not yet implemented.");  // TODO
+                    return MWL_RESULT_TYPE_ERROR;
+                } else {
+                    snprintf( bf, sizeof(bf)
+                            , "Unable to apply selector expression to"
+                              " `%s' data type."
+                            , mwl_to_str_type(bf1, sizeof(bf1), $1.dataType) );
+                    yyerror(&yylloc, ws, NULL, bf );
+                    return MWL_RESULT_TYPE_ERROR;
+                }
+            }
             ;
 
   arguments : expr {
@@ -236,51 +280,18 @@ mwl_mk_AST( char * strexpr
             }
             ;
 
-// XXX
+  mapValues : expr T_COLON expr {
+                $$.key = mwl_shallow_copy_node(&($1));
+                $$.value = mwl_shallow_copy_node(&($3));
+                $$.next = NULL;
+            }
+            | mapValues T_COMMA expr T_COLON expr {
+                $$.key = mwl_shallow_copy_node(&($3));
+                $$.value = mwl_shallow_copy_node(&($5));
+                $$.next = mwl_shallow_copy_map_entries(&($1));
+            }
+            ;
 
-//    princOp : cmpOp             { $$ = $1; }
-//            | T_PLUS            { $$ = kOp_ArithAdd; }
-//            | T_MINUS           { $$ = kOp_ArithSub; }
-//            | T_ASTERISK        { $$ = kOp_ArithMult; }
-//            | T_SLASH           { $$ = kOp_ArithDiv; }
-//            | T_CIRCUMFLEX      { $$ = kOp_BtwsXor; }
-//            | T_AMP             { $$ = kOp_BtwsAnd; }
-//            | T_PIPE            { $$ = kOp_BtwsOr; }
-//            | T_ASTERISK2       { $$ = kOp_ArithPow; }
-//            | logicOp           { $$ = $1; }
-//            ;
-//
-//      cmpOp : T_GT              { $$ = kOp_CmpGT; }
-//            | T_GTE             { $$ = kOp_CmpGE; }
-//            | T_LT              { $$ = kOp_CmpLT; }
-//            | T_LTE             { $$ = kOp_CmpLE; }
-//            | T_EQ              { $$ = kOp_CmpEq; }
-//            | T_NE              { $$ = kOp_CmpNE; }
-//            ;
-//
-//    logicOp : T_AMP2            { $$ = kOp_LogicAnd; }
-//            | T_PIPE2           { $$ = kOp_LogicOr; }
-//            ;
-//
-//   binOpSym : princOp                           { $$ = $1; }
-//            | T_DOT princOp                     { $$ = kOp_FS_NoLCompl | $2 ; }
-//            | princOp T_DOT                     { $$ =                   $1 | kOp_FS_NoRCompl; }
-//            | T_DOT princOp T_DOT               { $$ = kOp_FS_NoLCompl | $2 | kOp_FS_NoRCompl; }
-//            | T_REV_SLASH princOp               { $$ = kOp_FS_LvLCompl | $2 ; }
-//            | princOp T_REV_SLASH               { $$ =                   $1 | kOp_FS_LvRCompl; }
-//            | T_REV_SLASH princOp T_REV_SLASH   { $$ = kOp_FS_LvLCompl | $2 | kOp_FS_LvRCompl; }
-//            | T_DOT princOp T_REV_SLASH         { $$ = kOp_FS_NoLCompl | $2 | kOp_FS_LvRCompl; }
-//            | T_REV_SLASH princOp T_DOT         { $$ = kOp_FS_LvLCompl | $2 | kOp_FS_NoRCompl; }
-//            ;
-
-
-// foreignVal : frgnValTok
-//            | foreignVal T_DOT frgnValTok
-//            ;
-//
-// frgnValTok : T_FOREIGN_VALUE
-//            | T_FOREIGN_VALUE T_LSQBC selectExpr T_RSQBC
-//            ;
 //
 // selectExpr : baseSelExpr
 //            | selectExpr logicOp baseSelExpr

@@ -4,6 +4,7 @@
 #include "mwl-defs.h"
 #include "mwl-func.h"
 #include "mwl-ops.h"
+#include "mwl-set.h"
 
 #include <stdio.h>
 
@@ -16,6 +17,8 @@ struct mwl_Workspace;
 enum mwl_NodeType {
     mwl_kConstValue,    /* Constant, literal or any other immediately evaluated */
     mwl_kOperation,     /* Operation (binary, arithmetic, logic, comparison) */
+    mwl_kSet,           /* Set of values */
+    mwl_kMap,           /* (Assotiative) array */
     mwl_kFunction,      /* External function call */
     mwl_kParameter,     /* External parameter resolved at a runtime */
     mwl_kVariable,      /* Variable set before the execution */
@@ -41,6 +44,8 @@ struct mwl_ASTNode {
         struct mwl_ConstVal     asConstVal;     /* for kConstValue */
         struct mwl_Op           asOp;           /* for kOperation */
         struct mwl_Func         asFunction;     /* for kFunction */
+        struct mwl_Set          asSet;          /* for kSet */
+        struct mwl_Map          asMap;          /* for kMap */
         struct mwl_Parameter    asParameter;    /* for kParameter */
         struct mwl_Variable     asVariable;     /* for kVariable */
         struct mwl_Definitions* asNamespace;    /* for kDefinitions */

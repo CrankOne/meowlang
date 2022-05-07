@@ -19,6 +19,9 @@ struct mwl_ArgsList {
 /** Makes a shallow copy of arguments list node. */
 struct mwl_ArgsList * mwl_shallow_copy_args( const struct mwl_ArgsList * );
 
+/** Frees arguments list */
+void mwl_free_args_list( struct mwl_ArgsList * );
+
 /** Payload part of AST node representing foreign function call with certain
  * arguments */
 struct mwl_Func {
