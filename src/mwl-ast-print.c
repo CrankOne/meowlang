@@ -29,6 +29,7 @@ _impl_mwl_dump_AST( FILE * stream
                   , int depth
                   , char * prefix
                   ) {
+    assert(node);
     fputs(prefix, stream);
     for( char * c = prefix; *c != '\0'; ++c ) if('`' == *c) *c = ' ';
     if(!node) {
@@ -38,6 +39,9 @@ _impl_mwl_dump_AST( FILE * stream
     //char * endPtr = prefix + strlen(prefix);
     char buf[128];
     switch( node->nodeType ) {
+        case mwl_kUnresolvedIdentifier:
+            fprintf(stream, "- (unresolved) \"%s\"\n", node->pl.asUnresolved.name);
+            return;
         case mwl_kConstValue:
             fputs("- ", stream);
             mwl_to_str_constval(buf, sizeof(buf), &(node->pl.asConstVal));

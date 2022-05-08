@@ -21,25 +21,31 @@ extern "C" {
  *      a type of scalar used as a key and type code of collected elements
  *      (scalar or foreign)
  *    + foreign type code is the ID used for external resolver to address and
- *      arbitrary type. Foreign types are not the subject of any arithmetics.
+ *      arbitrary type. Foreign types are not the subject of any arithmetics
+ *      per se. [, but it is allowed for them to be converted into a certain type
+ *      by explicit operations?].
  * Also note, that code type is practically shorter by 1 bit than the declared
  * type since we do use it in `mwl_ASTNode` as `isVisited` flag.
  *
  * This way full bit structure used to identify and encode a type information.
- * When foreign bit is set in section, the rest 7 bits are interpreted as
- * foreign ID. If it is not set, their meaning is following:
+ * When foreign bit is set, "is scalar", "is numeric", "is float" bits are
+ * used to encode first 3 bits of the foreign type ID.
+ *
  *                                     logic   int     float    string     set     map foreign
  *  [  =1] "is foreign" flag               0     0         0         0       0       0       1
- *  [  =2] "is scalar" flag                1     1         1         0       x       x       x
- *  [  =3] "is numeric" flag               0     1         1         0       x       x       x
- *  [  =4] "is float" flag                 0     0         1         0       x       x       x
- *  [  =5] "is collection" flag            0     0         0         1       1       1       x
- *  [  =6] "is map"                        0     0         0         0       0       1       x
- *  [ 7-8] no meaning, reserved            x     x         x         x       x       x       x
+ *  [  =2] "is collection" flag            0     0         0         1       1       1       x
+ *  [  =3] "is map"                        0     0         0         0       0       1       x
+ *  [  =4] "is scalar" flag                1     1         1         0       x       x       *
+ *  [  =5] "is numeric" flag               0     1         1         0       x       x       *
+ *  [  =6] "is float" flag                 0     0         1         0       x       x       *
+ *  [ 7-8] no meaning, reserved            *     *         *         *       *       *       *
  * 
- * For all types except for maps the type ID is of one byte (8 bits).
+ * For all non-foreign and map types the type ID is within one byte (8 bits).
  * For maps the second byte is reserved for "mapped value type".
  */
+
+/** Maximum foreign type ID. Defined by number of free bits in types encodings */
+#define FOREIGN_TYPES_MAX_ID ((1 << 6)-1)
 
 /** Integer type used to identify node types */
 typedef uint32_t mwl_TypeCode_t;

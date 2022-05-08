@@ -47,7 +47,7 @@ mwl_Definitions::define_namespace( const std::string & name ) {
                             });
     if( !ir.second )
         throw mwl::error::DuplicatingDefinitionError(ir.first);
-    ir.first->second.pl.asNamespacePtr = new mwl_Definitions;
+    ir.first->second.pl.asNamespacePtr = new mwl_Definitions(foreignTypes);
     return ir.first;
 }
 

@@ -160,6 +160,11 @@ mwl_infer_type( mwl_TypeCode_t tcA
               , char * errBuf
               , size_t errBufSize
               ) {
+    /* First of all: unresolved operand type provokes unresolved type for
+     * operation */
+    if( 0x0 == tcA ) return 0x0;
+    if( (!(opCode & kOp_FUnary)) && 0x0 == tcB ) return 0x0;
+
     char buf1[64], buf2[64];
     if( (opCode & (0x1 << 16)) /* if op code implies map/set/string type */
      || (tcA & (mwl_kFIsCollection | mwl_kFIsForeign))

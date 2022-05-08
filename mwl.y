@@ -197,18 +197,11 @@ mwl_mk_AST( char * strexpr
             ;
 
  foreignVal : T_UNKNOWN_IDENTIFIER {
-                if( mwl_resolve_identifier_to_ast(&($$), ws->defs, $1) ) {
-                    char errbf[128];
-                    snprintf( errbf, sizeof(errbf)
-                            , "failed to resolve plain identifier \"%s\""
-                            , $1);
-                    yyerror( &yylloc, ws, NULL, errbf );
-                    free($1);
-                    return MWL_UNRESOLVED_IDENTIFIER_ERROR;
-                }
-                free($1);
-                $$.isVisited = 0;
-                $$.userdata = NULL;
+                int rc = mwl_resolve_identifier_to_ast(&($$), ws->defs, $1
+                    , yylloc.first_line, yylloc.first_column
+                    , yylloc.last_line, yylloc.last_column );
+                if( 0 == rc ) free($1);
+                else if( rc != 1 ) return MWL_UNRESOLVED_IDENTIFIER_ERROR;
             }
             | foreignVal T_DOT T_UNKNOWN_IDENTIFIER {
                 if( $1.nodeType != mwl_kNamespace ) {
@@ -220,21 +213,17 @@ mwl_mk_AST( char * strexpr
                     free($3);
                     return MWL_UNRESOLVED_IDENTIFIER_ERROR;
                 }
-                if( mwl_resolve_identifier_to_ast(&($$), $1.pl.asNamespace, $3) ) {
-                    char errbf[128];
-                    snprintf( errbf, sizeof(errbf)
-                            , "failed to resolve scoped identifier \"%s\""
-                            , $3);
-                    yyerror( &yylloc, ws, NULL, errbf );
-                    free($3);
-                    return MWL_UNRESOLVED_IDENTIFIER_ERROR;
-                }
-                free($3);
-                $$.isVisited = 0;
-                $$.userdata = NULL;
+                int rc = mwl_resolve_identifier_to_ast(&($$), $1.pl.asNamespace, $3
+                    , yylloc.first_line, yylloc.first_column
+                    , yylloc.last_line, yylloc.last_column );
+                if( 0 == rc ) free($3);  /* identifier was resolved */
+                else if( rc != 1 ) return MWL_UNRESOLVED_IDENTIFIER_ERROR;
             }
             | foreignVal T_LBC arguments T_RBC {
-                assert($1.nodeType == mwl_kFunction);
+                if($1.nodeType != mwl_kFunction) {
+                    yyerror( &yylloc, ws, NULL, "Call to not a function." );
+                    return MWL_RESULT_TYPE_ERROR;
+                }
                 $$ = $1;
                 $$.dataType = mwl_resolve_func_return_type(
                         $1.pl.asFunction.funcdef, &($3) );
@@ -248,25 +237,29 @@ mwl_mk_AST( char * strexpr
                 $$.userdata = 0;
             }
             | foreignVal T_LSQBC expr T_RSQBC {
+                int rc;
                 char bf[256], bf1[64];
-                /* Selectors are available for collections and foreign
-                 * values only */
-                if( mwl_kFIsForeign & $1.dataType ) {
-                    yyerror(&yylloc, ws, NULL, "TODO: foreign type selectors"
-                        " are not yet implemented.");  // TODO
-                    return MWL_RESULT_TYPE_ERROR;
-                } else if( mwl_kFIsCollection & $1.dataType ) {
-                    yyerror(&yylloc, ws, NULL, "TODO: collection selectors"
-                        " are not yet implemented.");  // TODO
-                    return MWL_RESULT_TYPE_ERROR;
-                } else {
-                    snprintf( bf, sizeof(bf)
-                            , "Unable to apply selector expression to"
-                              " `%s' data type."
-                            , mwl_to_str_type(bf1, sizeof(bf1), $1.dataType) );
+                /* Selectors are valid for:
+                 *  - variables of foreign types (in this case foreign type
+                 *    shall define additional selector context)
+                 *  - (todo) collections indexed with ordinary types, in which case
+                 *    selector result has its data type set and it must match
+                 *    to the collection's key type
+                 *  - (todo) collections indexed with foreign types which may define
+                 *    a sub-context specifically to selector expressions.
+                 */
+                if( !(mwl_kFIsForeign & $1.dataType) ) {
+                    //mwl_resolve_selector_context( $3, $1.as );
+                } else if( !(mwl_kFIsCollection & $1.dataType) ) {
+                    snprintf(bf, sizeof(bf), "selector expression applied to"
+                        " `%s' data type which is not a collection"
+                        , mwl_to_str_type(bf1, sizeof(bf1), $1.dataType) );
                     yyerror(&yylloc, ws, NULL, bf );
                     return MWL_RESULT_TYPE_ERROR;
                 }
+                /* a variable or set */
+                if( ! $3.dataType )
+                    return MWL_RESULT_TYPE_ERROR;
             }
             ;
 

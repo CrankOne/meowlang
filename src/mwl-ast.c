@@ -28,7 +28,8 @@ mwl_init_op_node( struct mwl_ASTNode * dest
     mwl_OpCode_t tp = mwl_infer_type( left->dataType, opCode
                                     , right ? right->dataType : 0x0
                                     , ws->errMsg, ws->errMsgSize );
-    if(!tp) {
+    if( (left->dataType != 0x0) && ( right ? 0x0 != right->dataType : 0x1 )
+     && 0x0 == tp ) {
         if('\0' == ws->errMsg[0]) {
             if( opCode & kOp_FUnary ) {
                 assert(!right);
@@ -51,6 +52,7 @@ mwl_init_op_node( struct mwl_ASTNode * dest
         }
         return MWL_ERROR_INCOMPAT_TYPE;
     }
+
     dest->nodeType = mwl_kOperation;
     dest->dataType = tp;
     dest->pl.asOp.code = opCode;
@@ -61,22 +63,27 @@ mwl_init_op_node( struct mwl_ASTNode * dest
     return 0;
 }
 
-/**\brief Resolves a string identifier into constval, namespace, function, etc
- *
- * This function is called during parsing and shall initialize new AST node
- * (provided by `dest` argument) with respect to previously known context
- * (like namespace resolution chain).
- *
- * \returns -1 if no definition found
- * */
 int
 mwl_resolve_identifier_to_ast( struct mwl_ASTNode * dest
                              , const struct mwl_Definitions * dict
-                             , const char * strtok
+                             , char * strtok
+                             , int fl, int fc
+                             , int ll, int lc
                              ) {
     assert(dest && dict && strtok);
     const struct mwl_Definition * cDef = mwl_find_definition(dict, strtok);
-    if( !cDef ) return -1;  /* definition not found */
+    if( !cDef ) { /* definition not found */
+        dest->nodeType = mwl_kUnresolvedIdentifier;
+        dest->dataType = 0x0;
+        dest->pl.asUnresolved.name = strtok;
+        dest->pl.asUnresolved.pos[0][0] = fl;
+        dest->pl.asUnresolved.pos[0][1] = fc;
+        dest->pl.asUnresolved.pos[0][0] = ll;
+        dest->pl.asUnresolved.pos[0][1] = lc;
+        return 1;
+    }
+    dest->isVisited = 0;
+    dest->userdata = NULL;
     switch(cDef->type) {
         case mwl_kDefConstval:
             /* definition aliases ordinary value (math or physical constant) */
@@ -94,12 +101,14 @@ mwl_resolve_identifier_to_ast( struct mwl_ASTNode * dest
         case mwl_kDefForeignCall:
             /* definition refers to a foreign function call */
             dest->nodeType = mwl_kFunction;
+            #warning "FIXME: function returned data type resolution"
             dest->dataType = 0x0;
             /* ^^^ NOTE: function returned data type is not resolved until
              * argslist is provided */
             dest->pl.asFunction.funcdef = &(cDef->pl.asFuncdef);
             return 0;
         default:
+            /* This shall never happen unless the unforeseen definitions type. */
             return -2;
     };
 }
@@ -152,8 +161,8 @@ _impl_mwl_AST_for_all_recursively( int depth
             }
             return 0;
         /* ... add other composite nodes here  */
+        case mwl_kUnresolvedIdentifier:
         case mwl_kConstValue:
-        case mwl_kParameter:
         case mwl_kVariable:
         case mwl_kNamespace:
             return 0;
@@ -223,7 +232,6 @@ mwl_AST_dfs( struct mwl_ASTNode * root
                     if(++top == stackEnd) return -1;
                     continue;
                 case mwl_kConstValue:
-                case mwl_kParameter:
                 case mwl_kVariable:
                     continue;
                     //callback(top->node, data);
@@ -256,7 +264,7 @@ _tsort_accumulate( struct mwl_ASTNode * node
                  , int depth
                  , void * rtso_ ) {
     struct ReentrantTSortObject * rtso = (struct ReentrantTSortObject *) rtso_;
-    struct ListEntry * le = malloc(sizeof(struct ListEntry *));
+    struct ListEntry * le = malloc(sizeof(struct ListEntry));
     le->node = node;
     le->depth = depth;
     le->next = rtso->tail;
@@ -284,6 +292,18 @@ mwl_AST_for_all_tsorted( struct mwl_ASTNode * root
         free(toDelete);
     }
     return rc;
+}
+
+/*                                                       ______________________
+ * ____________________________________________________/ Selector resolution */
+
+int
+mwl_resolve_selector_context( struct mwl_ASTNode * selectorNode
+                            , struct mwl_ASTNode * expression
+                            ) {
+    // ...
+    #error "Last TODO stub"
+    return 0x0;  // TODO
 }
 
 #ifndef NO_PLAIN_EVAL

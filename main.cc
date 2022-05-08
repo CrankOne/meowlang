@@ -3,6 +3,8 @@
 #include "mwl.tab.h"
 #include "mwl-ast-print.h"
 
+#include <map>
+
 static int
 _print_node( struct mwl_ASTNode * node
            , int depth
@@ -27,14 +29,45 @@ _print_node( struct mwl_ASTNode * node
     return 0;
 }
 
+struct Event {
+    std::map<int, int> foo;
+    // ...
+};
+
+struct HitA {
+    int n;
+};
+
+typedef std::map<int, HitA> HitsA;
 
 int
 main(int argc, char * argv[]) {
-    mwl_Definitions defs;
-    defs.define_int_constval( "foo", 42 );
+    mwl::ForeignTypes foreignTypes;
+    mwl_Definitions defs(foreignTypes);
 
     mwl_Definitions & mathDefs = *defs.define_namespace("m")->second.pl.asNamespacePtr;
-    mathDefs.define_float_constval("pi", M_PI);
+    mathDefs.define_constval("pi", M_PI);
+    // ... other constants
+    // ... functions: cos, sin, log, exp, etc.
+
+    # if 0
+    // Makign event to be a "foreign type" is an interesting case to make
+    // MWL to process the bunch of events. It is not the case with NA64 where
+    // we rather interested in analyzing subsets _within_ an event.
+    // Define the "event" foreign type
+    auto evIt = defs.define_foreign_type<Event>("event");
+    // Define some fields within an event
+    auto hitT1It = evIt->second.pl.asNamespacePtr->asForeignTypeTable
+    #else
+    auto hitsAIt = defs.define_foreign_type<HitsA>("hitsA"); {
+        assert( hitsAIt->second.type == mwl_Definition::mwl_kDefForeignType );
+        // define a table of operations
+        mwl_ForeignTypeTable & table = *hitsAIt->second.pl.asForeignTypeTable;
+        //table.
+    }
+    //hitsAIt->second.pl.asForeignTypeTable->selector_context
+    //    = _hits_a_ctx;
+    #endif
 
     mwl_ASTNode * ast = mwl_mk_AST( argv[1]
                                   , &defs  /* definitions */

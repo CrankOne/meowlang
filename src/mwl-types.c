@@ -4,11 +4,11 @@
 #include <string.h>
 
 const mwl_TypeCode_t mwl_kFIsForeign        = 0x1;
-const mwl_TypeCode_t mwl_kFIsScalar         = 0x1 << 1;
-const mwl_TypeCode_t mwl_kFIsNumeric        = 0x1 << 2;
-const mwl_TypeCode_t mwl_kFIsFloat          = 0x1 << 3;
-const mwl_TypeCode_t mwl_kFIsCollection     = 0x1 << 4;
-const mwl_TypeCode_t mwl_kFIsMap            = 0x1 << 5;
+const mwl_TypeCode_t mwl_kFIsCollection     = 0x1 << 1;
+const mwl_TypeCode_t mwl_kFIsMap            = 0x1 << 2;
+const mwl_TypeCode_t mwl_kFIsScalar         = 0x1 << 3;
+const mwl_TypeCode_t mwl_kFIsNumeric        = 0x1 << 4;
+const mwl_TypeCode_t mwl_kFIsFloat          = 0x1 << 5;
 const mwl_TypeCode_t mwl_kMScalarType       = ~( mwl_kFIsForeign
                                                | mwl_kFIsScalar
                                                | mwl_kFIsNumeric
