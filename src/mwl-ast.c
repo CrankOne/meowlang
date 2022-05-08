@@ -59,7 +59,11 @@ mwl_init_op_node( struct mwl_ASTNode * dest
     dest->pl.asOp.a = mwl_shallow_copy_node(left);
     if(right)
         dest->pl.asOp.b = mwl_shallow_copy_node(right);
+
+    dest->userdata = NULL;
     dest->isVisited = 0;
+    dest->selector = NULL;
+
     return 0;
 }
 
@@ -301,8 +305,17 @@ int
 mwl_resolve_selector_context( struct mwl_ASTNode * selectorNode
                             , struct mwl_ASTNode * expression
                             ) {
+    /* Selectors are valid for:
+     *  - variables of foreign types (in this case foreign type
+     *    shall define additional selector context)
+     *  - (todo) collections indexed with ordinary types, in which case
+     *    selector result has its data type set and it must match
+     *    to the collection's key type
+     *  - (todo) collections indexed with foreign types which may define
+     *    a sub-context specifically to selector expressions.
+     */
     // ...
-    #error "Last TODO stub"
+    //#error "Last TODO stub"
     return 0x0;  // TODO
 }
 

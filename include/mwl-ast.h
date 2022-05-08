@@ -79,6 +79,7 @@ struct mwl_ASTNode {
         struct mwl_UnresolvedIdentifierData asUnresolved; /**< for kUnresolvedIdentifier */
     } pl;
     void * userdata;
+    struct mwl_ASTNode * selector;
 };
 
 /**\brief Places copies of the nodes, infers type, etc */

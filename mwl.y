@@ -167,10 +167,16 @@ mwl_mk_AST( char * strexpr
                 $$.dataType = $1.dataType;
                 $$.nodeType = mwl_kConstValue;
                 $$.isVisited = 0;
-                $$.userdata = 0;
+                $$.userdata = NULL;
+                $$.selector = NULL;
             }
             | T_LCRLBC arguments T_RCRLBC {  // a set
                 $$.nodeType = mwl_kSet;
+
+                $$.isVisited = 0;
+                $$.userdata = NULL;
+                $$.selector = NULL;
+
                 $$.pl.asSet.dataType = mwl_induce_set_type(&($2), ws);
                 if( ! $$.pl.asSet.dataType ) {
                     yyerror( &yylloc, ws, NULL, "Failed to infer set type." );
@@ -182,6 +188,11 @@ mwl_mk_AST( char * strexpr
             }
             | T_LCRLBC mapValues T_RCRLBC {
                 $$.nodeType = mwl_kMap;
+
+                $$.isVisited = 0;
+                $$.userdata = NULL;
+                $$.selector = NULL;
+
                 $$.pl.asMap.dataType = mwl_induce_map_type(&($2), ws);
                 if( ! $$.pl.asMap.dataType ) {
                     yyerror( &yylloc, ws, NULL, "Failed to infer associative array type." );
@@ -194,6 +205,29 @@ mwl_mk_AST( char * strexpr
             | T_LBC expr T_RBC {$$ = $2;}
             //| foreignCall T_LBC expr T_RBC
             | foreignVal
+            | value T_LSQBC expr T_RSQBC {
+                int rc;
+                char bf[256], bf1[64];
+                if( !(mwl_kFIsCollection & $1.dataType) ) {
+                    snprintf(bf, sizeof(bf), "selector expression applied to"
+                        " `%s' data type which is not a collection"
+                        , mwl_to_str_type(bf1, sizeof(bf1), $1.dataType) );
+                    yyerror(&yylloc, ws, NULL, bf );
+                    return MWL_RESULT_TYPE_ERROR;
+                }
+                if( 0x0 == $3.dataType ) {
+                    rc = mwl_resolve_selector_context( &($3), &($1) );
+                    if( rc ) {
+                        snprintf(bf, sizeof(bf), "failed to resolve type of"
+                            " selector within the `%s' type's context"
+                            , mwl_to_str_type(bf1, sizeof(bf1), $1.dataType) );
+                        yyerror(&yylloc, ws, NULL, bf );
+                        return MWL_RESULT_TYPE_ERROR;
+                    }
+                    assert($3.dataType);
+                }
+                $1.selector = mwl_shallow_copy_node(&($3));
+            }
             ;
 
  foreignVal : T_UNKNOWN_IDENTIFIER {
@@ -235,31 +269,6 @@ mwl_mk_AST( char * strexpr
                 $$.pl.asFunction.argsList = $3;
                 $$.isVisited = 0;
                 $$.userdata = 0;
-            }
-            | foreignVal T_LSQBC expr T_RSQBC {
-                int rc;
-                char bf[256], bf1[64];
-                /* Selectors are valid for:
-                 *  - variables of foreign types (in this case foreign type
-                 *    shall define additional selector context)
-                 *  - (todo) collections indexed with ordinary types, in which case
-                 *    selector result has its data type set and it must match
-                 *    to the collection's key type
-                 *  - (todo) collections indexed with foreign types which may define
-                 *    a sub-context specifically to selector expressions.
-                 */
-                if( !(mwl_kFIsForeign & $1.dataType) ) {
-                    //mwl_resolve_selector_context( $3, $1.as );
-                } else if( !(mwl_kFIsCollection & $1.dataType) ) {
-                    snprintf(bf, sizeof(bf), "selector expression applied to"
-                        " `%s' data type which is not a collection"
-                        , mwl_to_str_type(bf1, sizeof(bf1), $1.dataType) );
-                    yyerror(&yylloc, ws, NULL, bf );
-                    return MWL_RESULT_TYPE_ERROR;
-                }
-                /* a variable or set */
-                if( ! $3.dataType )
-                    return MWL_RESULT_TYPE_ERROR;
             }
             ;
 
